@@ -24,88 +24,74 @@ export default function LoginPage() {
       });
 
       if (response.data.token) {
-        // Sauvegarde des données utilisateur dans le localStorage
+        // Save user data to localStorage
         localStorage.setItem("token", response.data.token);
         localStorage.setItem("role", response.data.role || "undefined");
         localStorage.setItem("department", response.data.department || "undefined");
         localStorage.setItem("firstName", response.data.firstName || "undefined");
         localStorage.setItem("userId", response.data.userId || "undefined");
 
-        // Redirection en fonction du rôle
+        // Role-based redirection according to the sidebar structure
         const userRole = response.data.role;
         setTimeout(() => {
-          switch (userRole) {
-            case "user":
-              router.push("/user-dashboard");
-              break;
-            case "guichetier":
-              router.push("/guichetier-dashboard");
-              break;
-            case "employee":
-              router.push("/employee-dashboard");
-              break;
-            case "admin":
-              router.push("/admin-dashboard");
-              break;
-            case "director":
-              router.push("/director-dashboard");
-              break;
-            default:
-              router.push("/default-dashboard");
-          }
+          const rolePaths: Record<string, string> = {
+            user: "/user-dashboard",
+            guichetier: "/dashboard/view-reclamations",
+            employee: "/dashboard/assign-tasks",
+            admin: "/dashboard/manage-users",
+            director: "/dashboard/view-reports",
+          };
+
+          router.push(rolePaths[userRole] || "/default-dashboard");
         }, 500);
       }
     } catch (err) {
-      setError("Email ou mot de passe incorrect.");
+      setError("Invalid email or password");
     }
   };
 
   return (
     <div className="flex min-h-screen">
-      {/* Côté gauche avec logo */}
+      {/* Left side with logo */}
       <div className="hidden lg:flex w-1/2 bg-gray-900 items-center justify-center">
-        <img src="/assets/cni.jpg" alt="Logo CNI" className="h-full w-auto object-contain" />
+        <img src="/assets/cni.jpg" alt="CNI Logo" className="h-32" />
       </div>
 
-      {/* Côté droit avec formulaire */}
+      {/* Right side with form */}
       <div className="w-full lg:w-1/2 flex flex-col justify-center items-center p-8">
         <div className="w-full max-w-md space-y-6">
           <div className="text-center">
-            <h1 className="text-2xl font-bold">Connexion</h1>
-            <p className="text-sm text-gray-500">
-              Nous vous aidons à résoudre votre réclamation !
-            </p>
+            <h1 className="text-2xl font-bold">Login</h1>
+            <p className="text-sm text-gray-500">Enter your credentials to access your account</p>
           </div>
 
           {error && <p className="text-sm text-red-500 text-center">{error}</p>}
 
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <Label htmlFor="email">Adresse e-mail</Label>
+              <Label htmlFor="email">Email</Label>
               <Input
                 id="email"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                placeholder="Entrez votre email"
-                className="h-12 text-lg"
+                placeholder="Enter your email"
               />
             </div>
             <div>
-              <Label htmlFor="password">Mot de passe</Label>
+              <Label htmlFor="password">Password</Label>
               <Input
                 id="password"
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                placeholder="Entrez votre mot de passe"
-                className="h-12 text-lg"
+                placeholder="Enter your password"
               />
             </div>
-            <Button type="submit" className="w-full h-12 text-lg">
-              Se connecter
+            <Button type="submit" className="w-full">
+              Login
             </Button>
           </form>
         </div>

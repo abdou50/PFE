@@ -12,7 +12,6 @@ export default function DashboardLayout({
       <div className="flex-1">
         <Navbar />
         <div>
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem></ThemeProvider>
         {children}
         </div>
       </div>
