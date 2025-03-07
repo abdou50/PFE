@@ -1,60 +1,56 @@
 const Reclamation = require("../models/Reclamation");
 
-
-exports.getReclamations = async (req, res) => {
-  try {
-    const reclamations = await Reclamation.find().populate("userId", "firstName lastName email");
-    res.json(reclamations);
-  } catch (err) {
-    res.status(500).json({ msg: "Server error" });
-  }
-};
-
-
-exports.getReclamationById = async (req, res) => {
-  try {
-    const reclamation = await Reclamation.findById(req.params.id).populate("userId", "firstName lastName email");
-    if (!reclamation) return res.status(404).json({ msg: "Reclamation not found" });
-    res.json(reclamation);
-  } catch (err) {
-    res.status(500).json({ msg: "Server error" });
-  }
-};
-
-
+// Create a new reclamation
 exports.createReclamation = async (req, res) => {
   try {
-    const reclamation = new Reclamation(req.body);
-    await reclamation.save();
-    res.status(201).json({ msg: "Reclamation created successfully", reclamation });
+    const { firstName, department, type, ministre, description, userId } = req.body;
+    const pdf = req.file ? req.file.path : null; // Save file path if uploaded
+
+    console.log("Received data:", { firstName, department, type, ministre, description, pdf, userId }); // Debugging
+
+    if (!userId) {
+      return res.status(400).json({ msg: "User ID is required" });
+    }
+
+    const newReclamation = new Reclamation({
+      firstName,
+      department,
+      type,
+      ministre,
+      description,
+      pdf,
+      userId,
+      status: "pending",
+    });
+
+    await newReclamation.save();
+    console.log("Reclamation saved successfully:", newReclamation); // Debugging
+    res.status(201).json({
+      msg: "Reclamation created successfully",
+      data: newReclamation,
+    });
   } catch (err) {
-    res.status(500).json({ msg: "Server error" });
+    console.error("Error creating reclamation:", err); // Debugging
+    res.status(500).json({ msg: "Server error", error: err.message });
   }
 };
 
-
-exports.updateReclamation = async (req, res) => {
+// Get reclamations by user ID
+exports.getReclamationsByUserId = async (req, res) => {
   try {
-    const { status, feedback, guichetierId, employeeId } = req.body;
-    const reclamation = await Reclamation.findByIdAndUpdate(
-      req.params.id,
-      { status, feedback, guichetierId, employeeId },
-      { new: true }
-    );
-    if (!reclamation) return res.status(404).json({ msg: "Reclamation not found" });
-    res.json({ msg: "Reclamation updated successfully", reclamation });
-  } catch (err) {
-    res.status(500).json({ msg: "Server error" });
-  }
-};
+    const { userId } = req.params;
+    console.log("Fetching reclamations for user ID:", userId); // Debugging
 
+    const reclamations = await Reclamation.find({ userId });
+    if (reclamations.length === 0) {
+      console.log("No reclamations found for user ID:", userId); // Debugging
+      return res.status(404).json({ msg: "No reclamations found for this user" });
+    }
 
-exports.deleteReclamation = async (req, res) => {
-  try {
-    const reclamation = await Reclamation.findByIdAndDelete(req.params.id);
-    if (!reclamation) return res.status(404).json({ msg: "Reclamation not found" });
-    res.json({ msg: "Reclamation deleted successfully" });
+    console.log("Reclamations fetched successfully:", reclamations); // Debugging
+    res.status(200).json({ msg: "Reclamations retrieved successfully", data: reclamations });
   } catch (err) {
-    res.status(500).json({ msg: "Server error" });
+    console.error("Error fetching reclamations:", err); // Debugging
+    res.status(500).json({ msg: "Server error", error: err.message });
   }
 };
