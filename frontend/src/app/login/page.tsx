@@ -6,16 +6,19 @@ import axios from "axios";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import Link from "next/link";
+import Image from "next/image";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsLoading(true);
+    setError("");
 
     try {
       const response = await axios.post("http://localhost:5000/api/users/login", {
@@ -24,64 +27,75 @@ export default function LoginPage() {
       });
 
       if (response.data.token) {
-        // Sauvegarde des données utilisateur dans le localStorage
+        // Save user data to localStorage
         localStorage.setItem("token", response.data.token);
         localStorage.setItem("role", response.data.role || "undefined");
         localStorage.setItem("department", response.data.department || "undefined");
         localStorage.setItem("firstName", response.data.firstName || "undefined");
         localStorage.setItem("userId", response.data.userId || "undefined");
 
-        // Redirection en fonction du rôle
-        const userRole = response.data.role;
-        setTimeout(() => {
-          switch (userRole) {
-            case "user":
-              router.push("/user-dashboard");
-              break;
-            case "guichetier":
-              router.push("/guichetier-dashboard");
-              break;
-            case "employee":
-              router.push("/employee-dashboard");
-              break;
-            case "admin":
-              router.push("/admin-dashboard");
-              break;
-            case "director":
-              router.push("/director-dashboard");
-              break;
-            default:
-              router.push("/default-dashboard");
+        // Save ministre and service to localStorage if role is "user"
+        if (response.data.role === "user") {
+          if (response.data.ministre) {
+            localStorage.setItem("ministre", response.data.ministre);
           }
-        }, 500);
+          if (response.data.service) {
+            localStorage.setItem("service", response.data.service);
+          }
+        } else {
+          localStorage.removeItem("ministre");
+          localStorage.removeItem("service");
+        }
+
+        // Redirect based on role
+        if (response.data.role === "user") {
+          router.push("/user-dashboard");
+        } else if (response.data.role === "guichetier") {
+          router.push("/guichetier-dashboard")
+
+        }
+
       }
-    } catch (err) {
-      setError("Email ou mot de passe incorrect.");
+    } catch (err: any) {
+      setError(err.response?.data?.msg || "Email ou mot de passe incorrect.");
+      console.error("Login error:", err);
+    } finally {
+      setIsLoading(false);
     }
   };
 
   return (
-    <div className="flex min-h-screen">
-      {/* Côté gauche avec logo */}
-      <div className="hidden lg:flex w-1/2 bg-gray-900 items-center justify-center">
-        <img src="/assets/cni.jpg" alt="Logo CNI" className="h-full w-auto object-contain" />
-      </div>
+    <div className="flex min-h-screen items-center justify-center p-6">
+      <div className="w-full max-w-md space-y-8 bg-background p-8 rounded-lg shadow-lg border border-border">
+        {/* Small Logo */}
+        <div className="flex justify-center">
+          <Image
+            src="/assets/cni1.png"
+            alt="Logo CNI"
+            width={100}
+            height={100}
+            className="object-contain"
+          />
+        </div>
 
-      {/* Côté droit avec formulaire */}
-      <div className="w-full lg:w-1/2 flex flex-col justify-center items-center p-8">
-        <div className="w-full max-w-md space-y-6">
-          <div className="text-center">
-            <h1 className="text-2xl font-bold">Connexion</h1>
-            <p className="text-sm text-gray-500">
-              Nous vous aidons à résoudre votre réclamation !
-            </p>
-          </div>
+        {/* Form Header */}
+        <div className="text-center">
+          <h1 className="text-3xl font-bold text-foreground">Connexion</h1>
+          <p className="text-sm text-muted-foreground mt-2">
+            Nous vous aidons à résoudre votre réclamation !
+          </p>
+        </div>
 
-          {error && <p className="text-sm text-red-500 text-center">{error}</p>}
+        {/* Error Message */}
+        {error && <p className="text-sm text-red-500 text-center">{error}</p>}
 
-          <form onSubmit={handleSubmit} className="space-y-6">
+        {/* Login Form */}
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="space-y-4">
             <div>
-              <Label htmlFor="email">Adresse e-mail</Label>
+              <Label htmlFor="email" className="text-sm font-medium text-foreground">
+                Adresse e-mail
+              </Label>
               <Input
                 id="email"
                 type="email"
@@ -93,7 +107,9 @@ export default function LoginPage() {
               />
             </div>
             <div>
-              <Label htmlFor="password">Mot de passe</Label>
+              <Label htmlFor="password" className="text-sm font-medium text-foreground">
+                Mot de passe
+              </Label>
               <Input
                 id="password"
                 type="password"
@@ -104,11 +120,16 @@ export default function LoginPage() {
                 className="h-12 text-lg"
               />
             </div>
-            <Button type="submit" className="w-full h-12 text-lg">
-              Se connecter
-            </Button>
-          </form>
-        </div>
+          </div>
+
+          <Button 
+            type="submit" 
+            className="w-full h-12 text-lg"
+            disabled={isLoading}
+          >
+            {isLoading ? "Connexion..." : "Se connecter"}
+          </Button>
+        </form>
       </div>
     </div>
   );

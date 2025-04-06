@@ -5,83 +5,155 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Toaster, toast } from "react-hot-toast";
-import { PDFDownloadLink, pdf } from "@react-pdf/renderer";
-import ReclamationPDF from "../../components/ReclamationPDF";
+import axios from "axios";
+import { pdf } from "@react-pdf/renderer";
+import ReclamationPDF from "../../components/ReclamationPDF"; // Import the PDF component
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 
 export default function CreateReclamationPage() {
-  const [firstName, setFirstName] = useState<string | null>(null);
-  const [department, setDepartment] = useState<string | null>(null);
-  const [userId, setUserId] = useState<string | null>(null);
-  const [type, setType] = useState<string>(() => localStorage.getItem("type") || "Reclamation");
-  const [ministre, setMinistre] = useState<string>(() => localStorage.getItem("ministre") || "");
-  const [description, setDescription] = useState<string>(() => localStorage.getItem("description") || "");
-  const [file, setFile] = useState<File | null>(null);
-  const [isClient, setIsClient] = useState(false);
+  const [firstName, setFirstName] = useState<string>("");
+  const [department, setDepartment] = useState<string>("");
+  const [userId, setUserId] = useState<string>("");
+  const [type, setType] = useState<string>("Reclamation");
+  const [service, setService] = useState<string>("");
+  const [title, setTitle] = useState<{ text: string; type: string }>({ text: "", type: "" });
+  const [ministre, setMinistre] = useState<string>("");
+  const [description, setDescription] = useState<string>("");
+  const [file, setFile] = useState<File[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [useAI, setUseAI] = useState(false);
+  const [aiDetails, setAiDetails] = useState<string>("");
+  const [isGenerating, setIsGenerating] = useState<boolean>(false);
+  const [isConfirmationOpen, setIsConfirmationOpen] = useState(false);
+  const [actionType, setActionType] = useState<"envoyer" | "brouillant">("envoyer");
 
-  // ✅ Load user data from localStorage
+  // Load initial data from localStorage
   useEffect(() => {
-    setIsClient(true);
-    const storedFirstName = localStorage.getItem("firstName");
-    const storedDepartment = localStorage.getItem("department");
-    const storedUserId = localStorage.getItem("userId");
-
-    console.log("📥 Retrieved from LocalStorage:");
-    console.log("First Name:", storedFirstName);
-    console.log("Department:", storedDepartment);
-    console.log("User ID:", storedUserId);
-
-    setFirstName(storedFirstName);
-    setDepartment(storedDepartment);
-    setUserId(storedUserId);
+    if (typeof window !== "undefined") {
+      const storedService = localStorage.getItem("service");
+      if (!storedService) {
+        toast.error("Service information is missing. Please log in again.");
+        // Optionally redirect to login
+        // router.push('/login');
+      }
+      setFirstName(localStorage.getItem("firstName") || "");
+      setDepartment(localStorage.getItem("department") || "");
+      setUserId(localStorage.getItem("userId") || "");
+      setMinistre(localStorage.getItem("ministre") || "");
+      setService(storedService || ""); // This will ensure service is set
+    }
   }, []);
 
-  // ✅ Save form data to localStorage whenever it changes
-  useEffect(() => {
-    localStorage.setItem("type", type);
-  }, [type]);
-
-  useEffect(() => {
-    localStorage.setItem("ministre", ministre);
-  }, [ministre]);
-
-  useEffect(() => {
-    localStorage.setItem("description", description);
-  }, [description]);
-
-  // ✅ Handle file selection
+  // Handle file upload
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files?.[0]) {
-      setFile(e.target.files[0]);
+    if (e.target.files && e.target.files.length > 0) {
+      const files = Array.from(e.target.files).filter(file => 
+        ["application/pdf", "image/jpeg", "image/png", "image/gif"].includes(file.type)
+      );
+      if (files.length > 0) {
+        setFile(files);
+      } else {
+        toast.error("Types autorisés : PDF, JPEG, PNG, GIF.");
+      }
     }
   };
 
-  // ✅ Handle form submission
+  // Typing effect for AI-generated description
+  const typeText = (text: string, setter: React.Dispatch<React.SetStateAction<string>>) => {
+    let index = 0;
+    const interval = setInterval(() => {
+      setter(text.slice(0, index));
+      index++;
+      if (index > text.length) clearInterval(interval);
+    }, 20); // Adjust typing speed here
+  };
+
+  // Handle AI-generated description
+  const generateDescriptionWithAI = async () => {
+    if (!title.text) {
+      toast.error("Veuillez d'abord entrer un titre.");
+      return;
+    }
+
+    setIsGenerating(true);
+
+    try {
+      // Combine default information and user-provided keywords
+      const prompt = `Rédige un texte descriptif pour une ${type}
+                     
+                    Le texte doit être court et concis, et doit inclure les informations suivantes :
+                    le nom ${firstName}. lieu de travail la ministére de ${ministre}.
+                    Titre: ${title.text}. 
+                    Détails supplémentaires: ${aiDetails}. 
+                    Le texte doit être clair, professionnel et détaillé en dissant le lieu du travail`;
+
+      const response = await axios.post(
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent",
+        {
+          contents: [
+            {
+              parts: [
+                {
+                  text: prompt, // Use the combined prompt
+                },
+              ],
+            },
+          ],
+        },
+        {
+          params: {
+            key: process.env.NEXT_PUBLIC_GEMINI_API_KEY, // Use environment variable
+          },
+          headers: {
+            "Content-Type": "application/json", // Set the content type
+          },
+        }
+      );
+
+      const generatedDescription = response.data.candidates[0].content.parts[0].text.trim();
+      typeText(generatedDescription, setDescription);
+      toast.success("Description générée avec succès !");
+    } catch (error) {
+      console.error("Error generating description:", error);
+      toast.error("Erreur lors de la génération de la description.");
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  // Handle form submission (send to database)
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsSubmitting(true);
 
     if (!userId) {
       toast.error("Utilisateur non trouvé. Veuillez vous reconnecter.");
+      setIsSubmitting(false);
+      return;
+    }
+
+    if (!title.text || !description) {
+      toast.error("Veuillez remplir tous les champs obligatoires.");
+      setIsSubmitting(false);
       return;
     }
 
     const formData = new FormData();
-    formData.append("firstName", firstName || "");
-    formData.append("department", department || "");
-    formData.append("userId", userId || ""); // Ensure userId is included
+    formData.append("firstName", firstName);
+    formData.append("department", department);
+    formData.append("userId", userId);
     formData.append("type", type);
+    formData.append("title", title.text);
+    formData.append("service", service);
+    formData.append("titleType", title.type);
     formData.append("ministre", ministre);
     formData.append("description", description);
-    if (file) formData.append("pdf", file);
+    formData.append("status", actionType); // Use the selected action type
 
-    console.log("📤 Form data being sent:", {
-      firstName,
-      department,
-      userId,
-      type,
-      ministre,
-      description,
-      file: file ? file.name : "No file",
-    }); // Debugging
+    // Append multiple files
+    file.forEach((f) => {
+      formData.append("files", f); // "files" doit correspondre au nom attendu par Multer
+    });
 
     try {
       const response = await fetch("http://localhost:5000/api/reclamations", {
@@ -91,110 +163,253 @@ export default function CreateReclamationPage() {
 
       if (response.ok) {
         toast.success("Réclamation créée avec succès !");
-        // Clear form fields after successful submission
-        setMinistre("");
+        setTitle({ text: "", type: "" });
         setDescription("");
-        setFile(null);
-        // Clear localStorage after successful submission
-        localStorage.removeItem("type");
-        localStorage.removeItem("ministre");
-        localStorage.removeItem("description");
+        setFile([]); // Set an empty array instead of null
+
+        // Open confirmation dialog for PDF download
+        setIsConfirmationOpen(true);
       } else {
         const errorMsg = await response.text();
         toast.error(`Erreur: ${errorMsg}`);
       }
     } catch (error) {
-      console.error("Network error:", error);
-      toast.error("Erreur réseau");
+      toast.error("Erreur réseau. Veuillez réessayer plus tard.");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  // ✅ Handle PDF download manually
+  // Handle saving locally (without sending to the database)
+  const handleSaveLocally = async () => {
+    if (!title.text || !description) {
+      toast.error("Veuillez remplir tous les champs obligatoires.");
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("firstName", firstName);
+    formData.append("department", department);
+    formData.append("userId", userId);
+    formData.append("type", type);
+    formData.append("title", title.text);
+    formData.append("service", service); 
+    formData.append("titleType", title.type);
+    formData.append("ministre", ministre);
+    formData.append("description", description);
+    formData.append("status", "brouillant"); // Ensure the status is "brouillant"
+
+    // Append multiple files
+    file.forEach((f) => {
+      formData.append("files", f); // "files" doit correspondre au nom attendu par Multer
+    });
+
+    try {
+      const response = await fetch("http://localhost:5000/api/reclamations", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (response.ok) {
+        toast.success("Réclamation enregistrée avec succès !");
+
+        // Open confirmation dialog for PDF download
+        setIsConfirmationOpen(true);
+      } else {
+        const errorMsg = await response.text();
+        toast.error(`Erreur: ${errorMsg}`);
+      }
+    } catch (error) {
+      toast.error("Erreur réseau. Veuillez réessayer plus tard.");
+    }
+  };
+
+  // Handle cancel
+  const handleCancel = () => {
+    setTitle({ text: "", type: "" });
+    setDescription("");
+    setFile([]); // Fix: Set an empty array instead of null
+    toast.success("Formulaire annulé.");
+  };
+
+  // Handle PDF download confirmation
   const handleDownloadPDF = async () => {
-    const blob = await pdf(
+    const pdfBlob = await pdf(
       <ReclamationPDF
-        firstName={firstName || ""}
-        department={department || ""}
+        firstName={firstName}
+        department={department}
         type={type}
         ministre={ministre}
         description={description}
       />
     ).toBlob();
 
-    const url = URL.createObjectURL(blob);
+    const url = URL.createObjectURL(pdfBlob);
     const link = document.createElement("a");
     link.href = url;
     link.download = "reclamation.pdf";
     link.click();
     URL.revokeObjectURL(url);
+
+    setIsConfirmationOpen(false);
   };
 
   return (
     <div className="flex flex-col h-full p-6">
       <Toaster />
-      <h1 className="text-2xl font-bold mb-6">Créer une Réclamation</h1>
+      <h1 className="text-2xl font-bold mb-6">Créer une Requêtes</h1>
       <form onSubmit={handleSubmit} className="space-y-4 flex-1">
         <div className="space-y-2">
           <Label>Prénom</Label>
-          <Input value={firstName || ""} readOnly />
+          <Input value={firstName} readOnly /> {/* Pre-filled from login */}
         </div>
+        
         <div className="space-y-2">
-          <Label>Département</Label>
-          <Input value={department || ""} readOnly />
+          <Label>Produit Cni</Label>
+          <Input value={department} readOnly /> {/* Pre-filled from login */}
         </div>
+
         <div className="space-y-2">
           <Label>Type de réclamation</Label>
           <select
             value={type}
             onChange={(e) => setType(e.target.value)}
-            className="w-full p-2 border rounded"
+            className="w-full p-2 border rounded bg-background text-foreground"
           >
             <option value="Reclamation">Réclamation</option>
             <option value="Data Request">Demande de Données</option>
           </select>
         </div>
+
         <div className="space-y-2">
-          <Label>Ministre</Label>
-          <Input
-            value={ministre}
-            onChange={(e) => setMinistre(e.target.value)}
-            required
+          <Label>Ministère</Label>
+          <Input value={ministre} readOnly /> {/* Pre-filled from login */}
+        </div>
+        <div className="space-y-2">
+           <Label>Service</Label>
+           <Input value={service} readOnly /> {/* Pre-filled from login */}
+         </div>
+        <div className="space-y-2">
+          <Label>Object</Label>
+          <Input 
+            value={title.text} 
+            onChange={(e) => setTitle({ ...title, text: e.target.value })} 
+            required 
           />
         </div>
+
         <div className="space-y-2">
           <Label>Description</Label>
-          <Textarea
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            required
-          />
+          {useAI ? (
+            <div className="space-y-2">
+              <div className="space-y-2">
+                <Label>Mots-clés pour l'IA</Label>
+                <Textarea
+                  value={aiDetails}
+                  onChange={(e) => setAiDetails(e.target.value)}
+                  placeholder="Entrez des mots-clés pour guider l'IA (ex: problème de transport, retard, surcharge)."
+                  className="min-h-[80px]"
+                />
+              </div>
+              <Button
+                type="button"
+                onClick={generateDescriptionWithAI}
+                className="w-full"
+                disabled={isGenerating}
+              >
+                {isGenerating ? "Génération en cours..." : "Générer la description avec l'IA"}
+              </Button>
+              {isGenerating && (
+                <div className="flex justify-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+                </div>
+              )}
+              <Textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                required
+                className="min-h-[120px]"
+              />
+            </div>
+          ) : (
+            <Textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              required
+              className="min-h-[120px]"
+            />
+          )}
         </div>
         <div className="space-y-2">
-          <Label>Joindre un fichier (Optionnel)</Label>
-          <Input
-            type="file"
-            accept="application/pdf"
-            onChange={handleFileChange}
+          <Label>Joindre un fichier (PDF ou image, optionnel)</Label>
+          <Input 
+            type="file" 
+            accept="application/pdf, image/*" 
+            multiple
+            onChange={handleFileChange} 
           />
         </div>
-        <Button
-          type="submit"
-          className="w-full mt-6 bg-blue-600 hover:bg-blue-700 text-white"
-        >
-          Créer une Réclamation
-        </Button>
 
-        {isClient && (
-          <div className="mt-6">
-            <Button
-              onClick={handleDownloadPDF}
-              className="w-full bg-green-600 hover:bg-green-700 text-white"
-            >
-              Télécharger le PDF
-            </Button>
-          </div>
-        )}
+        <div className="flex gap-4">
+          <Button 
+            type="submit" 
+            className="flex-1" 
+            disabled={isSubmitting}
+            onClick={() => setActionType("envoyer")}
+          >
+            {isSubmitting ? "Envoi en cours..." : "Envoyer"}
+          </Button>
+          
+          <Button 
+            type="button" 
+            variant="secondary" 
+            className="flex-1"
+            onClick={() => {
+              setActionType("brouillant");
+              handleSaveLocally();
+            }}
+          >
+            Enregistrer
+          </Button>
+
+          <Button 
+            type="button" 
+            variant="destructive" 
+            className="flex-1"
+            onClick={handleCancel}
+          >
+            Annuler
+          </Button>
+        </div>
+
+        <div className="flex justify-center">
+          <Button
+            type="button"
+            variant={useAI ? "default" : "outline"}
+            onClick={() => setUseAI(!useAI)}
+          >
+            {useAI ? "Écrire la description moi-même" : "Utiliser l'IA pour générer la description"}
+          </Button>
+        </div>
       </form>
+
+      {/* Confirmation Dialog for PDF Download */}
+      <Dialog open={isConfirmationOpen} onOpenChange={setIsConfirmationOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Télécharger le PDF</DialogTitle>
+            <DialogDescription>
+              Voulez-vous télécharger un PDF de cette réclamation ?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button onClick={() => setIsConfirmationOpen(false)} variant="secondary">
+              Non
+            </Button>
+            <Button onClick={handleDownloadPDF}>Oui, télécharger</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
