@@ -22,31 +22,31 @@ exports.loginUser = async (req, res) => {
     // Create JWT payload
     const payload = {
       user: {
-        userId: user._id, // Use user._id instead of User._id
+        userId: user._id,
         role: user.role,
         department: user.department,
         firstName: user.firstName,
+        ...(user.role === "user" && { 
+          ministre: user.ministre,
+          service: user.service
+        }),
       },
     };
 
     // Generate JWT token
     const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: "1h" });
 
-    // Log response data for debugging
-    console.log("🚀 Backend Response Data:", {
-      userId: user._id, // Corrected: Use user._id
-      role: user.role,
-      department: user.department,
-      firstName: user.firstName,
-    });
-
     // Send response to frontend
     res.json({
       token,
-      userId: user._id, // Include userId in the response
+      userId: user._id,
       role: user.role,
       department: user.department,
       firstName: user.firstName,
+      ...(user.role === "user" && { 
+        ministre: user.ministre,
+        service: user.service
+      }),
     });
   } catch (err) {
     console.error("Error in loginUser:", err.message);
@@ -80,11 +80,21 @@ exports.getUserById = async (req, res) => {
 // Create User
 exports.createUser = async (req, res) => {
   try {
-    const { firstName, lastName, email, password, role, department } = req.body;
+    const { firstName, lastName, email, password, role, department, ministre, service } = req.body;
 
     // Check if user already exists
     let user = await User.findOne({ email });
     if (user) return res.status(400).json({ msg: "User already exists" });
+
+    // Validate required fields for role "user"
+    if (role === "user") {
+      if (!ministre) {
+        return res.status(400).json({ msg: "Ministre is required for users" });
+      }
+      if (!service) {
+        return res.status(400).json({ msg: "Service is required for users" });
+      }
+    }
 
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -97,6 +107,10 @@ exports.createUser = async (req, res) => {
       password: hashedPassword,
       role,
       department,
+      ...(role === "user" && { 
+        ministre,
+        service
+      }),
     });
 
     // Save user to database
@@ -108,15 +122,53 @@ exports.createUser = async (req, res) => {
   }
 };
 
+// Get employees by department
+exports.getEmployeesByDepartment = async (req, res) => {
+  try {
+    const { department } = req.query;
+
+    // Fetch employees with the same department and role "employee"
+    const employees = await User.find({ department, role: "employee" }).select("-password");
+
+    if (employees.length === 0) {
+      return res.status(404).json({ msg: "No employees found for this department" });
+    }
+
+    res.status(200).json({ msg: "Employees retrieved successfully", data: employees });
+  } catch (err) {
+    console.error("Error fetching employees by department:", err);
+    res.status(500).json({ msg: "Server error", error: err.message });
+  }
+};
+
 // Update User
 exports.updateUser = async (req, res) => {
   try {
-    const { firstName, lastName, role, department } = req.body;
+    const { firstName, lastName, role, department, ministre, service } = req.body;
+
+    // Validate required fields for role "user"
+    if (role === "user") {
+      if (!ministre) {
+        return res.status(400).json({ msg: "Ministre is required for users" });
+      }
+      if (!service) {
+        return res.status(400).json({ msg: "Service is required for users" });
+      }
+    }
 
     // Find and update user
     const user = await User.findByIdAndUpdate(
       req.params.id,
-      { firstName, lastName, role, department },
+      { 
+        firstName, 
+        lastName, 
+        role, 
+        department,
+        ...(role === "user" && { 
+          ministre,
+          service
+        })
+      },
       { new: true }
     );
 

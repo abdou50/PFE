@@ -5,30 +5,40 @@ const reclamationController = require("../controllers/reclamationController");
 
 const router = express.Router();
 
-// Configure Multer for PDF uploads
+// Configure Multer for file uploads
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, "uploads/reclamations/"); // Save PDFs to "uploads/reclamations" folder
+    cb(null, "uploads/reclamations/"); // Save files to "uploads/reclamations" folder
   },
   filename: (req, file, cb) => {
     const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-    cb(null, uniqueSuffix + path.extname(file.originalname)); // Unique filename
+    cb(null, uniqueSuffix + path.extname(file.originalname));
   },
 });
 
 const upload = multer({
   storage,
   fileFilter: (req, file, cb) => {
-    if (file.mimetype === "application/pdf") {
+    if (file.mimetype === "application/pdf" || file.mimetype.startsWith("image/")) {
       cb(null, true);
     } else {
-      cb(new Error("Only PDF files are allowed"), false);
+      cb(new Error("Only PDF and image files are allowed"), false);
     }
   },
 });
+router.use("/uploads/reclamations", express.static(path.join(__dirname, "../uploads/reclamations")));
+router.post("/", upload.array("files", 10), reclamationController.createReclamation);
 
-// Routes
-router.post("/", upload.single("pdf"), reclamationController.createReclamation);
+router.put("/:id", upload.array("files", 10), reclamationController.updateReclamation);
+
 router.get("/user/:userId", reclamationController.getReclamationsByUserId);
 
+router.get("/department/:department", reclamationController.getReclamationsByDepartment);
+
+router.put("/:id/status", reclamationController.updateStatus);
+
+router.get("/user/:userId/filter", reclamationController.getFilteredReclamations);
+
+router.get("/:id", reclamationController.getReclamationById);
+router.delete('/:id', reclamationController.deleteReclamation);
 module.exports = router;

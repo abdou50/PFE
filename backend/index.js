@@ -4,6 +4,7 @@ const cors = require("cors");
 const connectDB = require("./config/db");
 const userRoutes = require("./routes/userRoutes");
 const reclamationRoutes = require("./routes/reclamationRoutes");
+const path = require("path");
 
 dotenv.config();
 connectDB();
@@ -11,16 +12,16 @@ connectDB();
 const app = express();
 
 const corsOptions = {
-  origin : process.env.FRONTEND_URL,
-  Credential: true,
+  origin: process.env.FRONTEND_URL,
+  credentials: true,
   optionsSuccessStatus: 200,
 };
-app.use(cors(corsOptions))
+app.use(cors(corsOptions));
 
 app.use(express.json());
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
-app.options('*', cors());
-
+app.options("*", cors());
 app.use("/api/users", userRoutes);
 app.use("/api/reclamations", reclamationRoutes);
 
