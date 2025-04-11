@@ -52,7 +52,11 @@ export default function LoginPage() {
           router.push("/user-dashboard");
         } else if (response.data.role === "guichetier") {
           router.push("/guichetier-dashboard")
-
+        }else if
+          (response.data.role === "employee"){
+          router.push("/employee-dashboard");
+        } else {
+          router.push("/");
         }
 
       }

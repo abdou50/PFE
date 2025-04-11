@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { FileText, User, Briefcase, Landmark, MessageCircle, File, Check, X, ChevronRight, ChevronLeft, Circle } from "lucide-react";
+import { FileText, User, Briefcase, Landmark, MessageCircle, File, Check, X, ChevronRight, ChevronLeft, Circle, Clipboard } from "lucide-react";
 import axios from "axios";
 import toast, { Toaster } from "react-hot-toast";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -18,6 +18,7 @@ type Reclamation = {
   _id: string;
   title: string;
   firstName: string;
+  lastName: string;
   department: string;
   type: string;
   ministre: string;
@@ -25,24 +26,22 @@ type Reclamation = {
   files: string[];
   userId: string;
   guichetierId?: string;
+  guichetierName?: string;
   employeeId?: string;
+  employeeName?: string;
   status: "envoyer" | "en attente" | "rejetée" | "traitée";
   feedback?: string;
   createdAt: string;
   service?: string;
-};
-
-type Employee = {
-  _id: string;
-  firstName: string;
-  lastName: string;
+  phone?: string;
+  email?: string;
 };
 
 const STATUS_TRANSLATIONS = {
   envoyer: { 
     label: "Nouvelle Requête", 
-    color: "bg-blue-500", // Blue badge
-    rowClass: "bg-red-50 hover:bg-red-100 dark:bg-red-900/30 dark:hover:bg-red-900/50", // Red row
+    color: "bg-blue-500",
+    rowClass: "bg-red-50 hover:bg-red-100 dark:bg-red-900/30 dark:hover:bg-red-900/50",
     flash: true
   },
   "en attente": { 
@@ -53,7 +52,7 @@ const STATUS_TRANSLATIONS = {
   },
   rejetée: { 
     label: "Rejetée", 
-    color: "bg-red-500", // Red badge
+    color: "bg-red-500",
     rowClass: "bg-gray-50 hover:bg-gray-100 dark:bg-gray-900/30 dark:hover:bg-gray-900/50",
     flash: false
   },
@@ -80,7 +79,7 @@ const TYPE_TRANSLATIONS = {
   "Reclamation": "Réclamation",
 };
 
-export default function ReclamationTable({ data }: { data: Reclamation[] }) {
+export default function EmployeeReclamationTable() {
   const { theme } = useTheme();
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(5);
@@ -90,47 +89,52 @@ export default function ReclamationTable({ data }: { data: Reclamation[] }) {
   const [selectedReclamation, setSelectedReclamation] = useState<Reclamation | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [feedbackText, setFeedbackText] = useState("");
-  const [showFeedbackField, setShowFeedbackField] = useState(false);
-  const [employees, setEmployees] = useState<Employee[]>([]);
-  const [selectedEmployee, setSelectedEmployee] = useState<string>("");
-  const [guichetierId, setGuichetierId] = useState<string>("");
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [isImageModalOpen, setIsImageModalOpen] = useState(false);
   const [isPriseEnChargeOpen, setIsPriseEnChargeOpen] = useState(false);
-  const [isLoadingAI, setIsLoadingAI] = useState(false);
   const [selectedSuggestion, setSelectedSuggestion] = useState<"rejetée" | "résolue" | null>(null);
   const [selectedRejectionReasons, setSelectedRejectionReasons] = useState<number[]>([]);
   const [additionalDetails, setAdditionalDetails] = useState("");
   const [isTyping, setIsTyping] = useState(false);
+  const [employeeId, setEmployeeId] = useState("");
+  const [reclamations, setReclamations] = useState<Reclamation[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const storedGuichetierId = localStorage.getItem("userId") ?? "";
-    setGuichetierId(storedGuichetierId);
+    const fetchEmployeeData = async () => {
+      try {
+        const storedEmployeeId = localStorage.getItem("userId") ?? "";
+        setEmployeeId(storedEmployeeId);
+        
+        if (storedEmployeeId) {
+          const response = await axios.get(`http://localhost:5000/api/reclamations/employee/${storedEmployeeId}`);
+          setReclamations(response.data.data);
+        }
+      } catch (error) {
+        console.error("Error fetching reclamations:", error);
+        toast.error("Échec du chargement des réclamations");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchEmployeeData();
   }, []);
 
-  useEffect(() => {
-    if (selectedReclamation) {
-      axios
-        .get(`http://localhost:5000/api/users/employees/by-department?department=${selectedReclamation.department}`)
-        .then((response) => {
-          setEmployees(response.data.data);
-        })
-        .catch((error) => {
-          console.error("Error fetching employees:", error);
-          toast.error("Erreur lors de la récupération des employés");
-        });
-    }
-  }, [selectedReclamation]);
+  // Filter data to only show reclamations assigned to this employee
+  const employeeReclamations = useMemo(() => {
+    return reclamations.filter(reclamation => reclamation.employeeId === employeeId);
+  }, [reclamations, employeeId]);
 
   const filteredData = useMemo(() => {
-    return data.filter((reclamation) => {
+    return employeeReclamations.filter((reclamation) => {
       const matchesSearch =
         reclamation.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        reclamation.lastName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         reclamation.ministre.toLowerCase().includes(searchTerm.toLowerCase()) ||
         reclamation.type.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (reclamation.service && reclamation.service.toLowerCase().includes(searchTerm.toLowerCase()));
 
-      // Handle status filter with translations
       let statusMatch = true;
       if (statusFilter !== "all") {
         if (statusFilter === "Nouvelle Requête") {
@@ -148,7 +152,7 @@ export default function ReclamationTable({ data }: { data: Reclamation[] }) {
 
       return matchesSearch && statusMatch && matchesType;
     });
-  }, [data, searchTerm, statusFilter, typeFilter]);
+  }, [employeeReclamations, searchTerm, statusFilter, typeFilter]);
 
   const totalPages = Math.ceil(filteredData.length / itemsPerPage);
   const paginatedData = useMemo(() => {
@@ -160,71 +164,11 @@ export default function ReclamationTable({ data }: { data: Reclamation[] }) {
     try {
       const response = await axios.get(`http://localhost:5000/api/reclamations/${reclamationId}`);
       const reclamation = response.data.data;
-
-      if (reclamation.status === "envoyer") {
-        setSelectedReclamation(reclamation);
-        setIsDialogOpen(true);
-
-        await axios.put(`http://localhost:5000/api/reclamations/${reclamationId}`, {
-          status: "en attente",
-          guichetierId: localStorage.getItem("userId") ?? "",
-        });
-        
-        // Update the local data to reflect the status change
-        const updatedData: Reclamation[] = data.map(item => 
-          item._id === reclamationId ? { ...item, status: "en attente" } : item
-        );
-        data = updatedData;
-        
-        toast.success("Statut mis à jour à 'en cours de traitement'");
-      } else {
-        setSelectedReclamation(reclamation);
-        setIsDialogOpen(true);
-      }
+      setSelectedReclamation(reclamation);
+      setIsDialogOpen(true);
     } catch (error) {
       console.error("Error fetching reclamation details:", error);
       toast.error("Échec de la récupération des détails de la réclamation");
-    }
-  };
-
-  const handlePriseEnCharge = async () => {
-    if (!selectedReclamation || !guichetierId) return;
-
-    try {
-      const response = await axios.put(`http://localhost:5000/api/reclamations/${selectedReclamation._id}`, {
-        guichetierId,
-        feedback: feedbackText,
-        status: "en attente",
-      });
-
-      if (response.status === 200) {
-        toast.success("Réclamation prise en charge avec succès");
-        setIsDialogOpen(false);
-        setIsPriseEnChargeOpen(true);
-      }
-    } catch (error) {
-      console.error("Error taking charge:", error);
-      toast.error("Échec de la prise en charge");
-    }
-  };
-
-  const handleAssignEmployee = async () => {
-    if (!selectedEmployee || !selectedReclamation) return;
-
-    try {
-      const response = await axios.put(`http://localhost:5000/api/reclamations/${selectedReclamation._id}`, {
-        employeeId: selectedEmployee,
-        status: "en attente",
-      });
-
-      if (response.status === 200) {
-        const assignedEmployee = employees.find((emp) => emp._id === selectedEmployee);
-        toast.success(`Réclamation affectée à ${assignedEmployee?.firstName} ${assignedEmployee?.lastName}`);
-        setIsDialogOpen(false);
-      }
-    } catch (error) {
-      console.error("Error assigning employee:", error);
-      toast.error("Échec de l'affectation à un technicien");
     }
   };
 
@@ -254,7 +198,9 @@ export default function ReclamationTable({ data }: { data: Reclamation[] }) {
         toast.success(`Réclamation marquée comme ${newStatus}`);
         setIsDialogOpen(false);
         setIsPriseEnChargeOpen(false);
-        window.location.reload();
+        // Refresh the data
+        const updatedResponse = await axios.get(`http://localhost:5000/api/reclamations/employee/${employeeId}`);
+        setReclamations(updatedResponse.data.data);
       }
     } catch (error) {
       console.error("Error updating status:", error);
@@ -298,7 +244,6 @@ export default function ReclamationTable({ data }: { data: Reclamation[] }) {
         : [...prev, id]
     );
     
-    // Add the selected reason to the feedback text with typing animation
     const reason = REJECTION_REASONS.find(r => r.id === id);
     if (reason) {
       const newText = `- ${reason.reason}: ${reason.description}\n`;
@@ -319,6 +264,19 @@ export default function ReclamationTable({ data }: { data: Reclamation[] }) {
     }, 20);
   };
 
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    toast.success("Copié dans le presse-papier");
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
   return (
     <div className="p-6 space-y-4">
       <Toaster 
@@ -335,7 +293,7 @@ export default function ReclamationTable({ data }: { data: Reclamation[] }) {
       {/* Search and Filters */}
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
         <Input
-          placeholder="Rechercher par prénom, ministre, service ou type..."
+          placeholder="Rechercher par prénom, nom, ministre, service ou type..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           className="w-full sm:max-w-md bg-background text-foreground"
@@ -372,6 +330,7 @@ export default function ReclamationTable({ data }: { data: Reclamation[] }) {
           <TableHeader>
             <TableRow className="hover:bg-transparent">
               <TableCell className="font-semibold">Prénom</TableCell>
+              <TableCell className="font-semibold">Nom</TableCell>
               <TableCell className="font-semibold">Service</TableCell>
               <TableCell className="font-semibold">Type</TableCell>
               <TableCell className="font-semibold">Ministre</TableCell>
@@ -380,29 +339,38 @@ export default function ReclamationTable({ data }: { data: Reclamation[] }) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {paginatedData.map((reclamation) => (
-              <TableRow
-                key={reclamation._id}
-                className={`${STATUS_TRANSLATIONS[reclamation.status].rowClass} transition-colors cursor-pointer`}
-                onClick={() => handleRowClick(reclamation._id)}
-              >
-                <TableCell>{reclamation.firstName}</TableCell>
-                <TableCell>{reclamation.service || "Non spécifié"}</TableCell>
-                <TableCell>{TYPE_TRANSLATIONS[reclamation.type as keyof typeof TYPE_TRANSLATIONS] || reclamation.type}</TableCell>
-                <TableCell>{reclamation.ministre}</TableCell>
-                <TableCell>
-                  <div className="flex items-center gap-2">
-                    <Badge className={`${STATUS_TRANSLATIONS[reclamation.status].color} text-white px-3 py-1 rounded-full`}>
-                      {STATUS_TRANSLATIONS[reclamation.status].label}
-                    </Badge>
-                    {STATUS_TRANSLATIONS[reclamation.status].flash && (
-                      <Circle className="w-2 h-2 text-red-500 animate-pulse" fill="currentColor" />
-                    )}
-                  </div>
+            {paginatedData.length > 0 ? (
+              paginatedData.map((reclamation) => (
+                <TableRow
+                  key={reclamation._id}
+                  className={`${STATUS_TRANSLATIONS[reclamation.status].rowClass} transition-colors cursor-pointer`}
+                  onClick={() => handleRowClick(reclamation._id)}
+                >
+                  <TableCell>{reclamation.firstName}</TableCell>
+                  <TableCell>{reclamation.lastName || "Non spécifié"}</TableCell>
+                  <TableCell>{reclamation.service || "Non spécifié"}</TableCell>
+                  <TableCell>{TYPE_TRANSLATIONS[reclamation.type as keyof typeof TYPE_TRANSLATIONS] || reclamation.type}</TableCell>
+                  <TableCell>{reclamation.ministre}</TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <Badge className={`${STATUS_TRANSLATIONS[reclamation.status].color} text-white px-3 py-1 rounded-full`}>
+                        {STATUS_TRANSLATIONS[reclamation.status].label}
+                      </Badge>
+                      {STATUS_TRANSLATIONS[reclamation.status].flash && (
+                        <Circle className="w-2 h-2 text-red-500 animate-pulse" fill="currentColor" />
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell>{new Date(reclamation.createdAt).toLocaleDateString()}</TableCell>
+                </TableRow>
+              ))
+            ) : (
+              <TableRow>
+                <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                  Aucune réclamation trouvée
                 </TableCell>
-                <TableCell>{new Date(reclamation.createdAt).toLocaleDateString()}</TableCell>
               </TableRow>
-            ))}
+            )}
           </TableBody>
         </Table>
       </div>
@@ -469,7 +437,17 @@ export default function ReclamationTable({ data }: { data: Reclamation[] }) {
                       <p className="text-sm font-medium flex items-center gap-2">
                         <User className="w-4 h-4" /> Utilisateur
                       </p>
-                      <p className="text-sm">{selectedReclamation.firstName}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm">
+                          {selectedReclamation.firstName} {selectedReclamation.lastName}
+                        </p>
+                        <button 
+                          onClick={() => copyToClipboard(`${selectedReclamation.firstName} ${selectedReclamation.lastName}`)}
+                          className="text-muted-foreground hover:text-primary"
+                        >
+                          <Clipboard className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
                     <div className="space-y-2">
                       <p className="text-sm font-medium flex items-center gap-2">
@@ -481,13 +459,65 @@ export default function ReclamationTable({ data }: { data: Reclamation[] }) {
                       <p className="text-sm font-medium flex items-center gap-2">
                         <Landmark className="w-4 h-4" /> Ministère
                       </p>
-                      <p className="text-sm">{selectedReclamation.ministre}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm">{selectedReclamation.ministre}</p>
+                        <button 
+                          onClick={() => copyToClipboard(selectedReclamation.ministre)}
+                          className="text-muted-foreground hover:text-primary"
+                        >
+                          <Clipboard className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
                     <div className="space-y-2">
                       <p className="text-sm font-medium flex items-center gap-2">
                         <Briefcase className="w-4 h-4" /> Service
                       </p>
                       <p className="text-sm">{selectedReclamation.service || "Non spécifié"}</p>
+                    </div>
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium flex items-center gap-2">
+                        <User className="w-4 h-4" /> Guichetier
+                      </p>
+                      <p className="text-sm">{selectedReclamation.guichetierName || "Non assigné"}</p>
+                    </div>
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium flex items-center gap-2">
+                        <User className="w-4 h-4" /> Employé assigné
+                      </p>
+                      <p className="text-sm">{selectedReclamation.employeeName || "Non assigné"}</p>
+                    </div>
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium flex items-center gap-2">
+                        <User className="w-4 h-4" /> Contact
+                      </p>
+                      <div className="flex flex-col gap-1">
+                        {selectedReclamation.phone && (
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm">{selectedReclamation.phone}</span>
+                            <button 
+                              onClick={() => copyToClipboard(selectedReclamation.phone!)}
+                              className="text-muted-foreground hover:text-primary"
+                            >
+                              <Clipboard className="w-4 h-4" />
+                            </button>
+                          </div>
+                        )}
+                        {selectedReclamation.email && (
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm">{selectedReclamation.email}</span>
+                            <button 
+                              onClick={() => copyToClipboard(selectedReclamation.email!)}
+                              className="text-muted-foreground hover:text-primary"
+                            >
+                              <Clipboard className="w-4 h-4" />
+                            </button>
+                          </div>
+                        )}
+                        {!selectedReclamation.phone && !selectedReclamation.email && (
+                          <span className="text-sm text-muted-foreground">Non spécifié</span>
+                        )}
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
@@ -537,22 +567,30 @@ export default function ReclamationTable({ data }: { data: Reclamation[] }) {
                     </div>
                   </CardContent>
                 </Card>
+
+                {selectedReclamation.feedback && (
+                  <Card className="bg-muted/20">
+                    <CardHeader>
+                      <CardTitle className="text-lg">Feedback</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <pre className="text-sm whitespace-pre-wrap p-3 rounded bg-muted/50">
+                        {selectedReclamation.feedback}
+                      </pre>
+                    </CardContent>
+                  </Card>
+                )}
               </div>
             </ScrollArea>
             <div className="flex gap-4 mt-6 justify-end">
-              <Button
-                onClick={() => setIsPriseEnChargeOpen(true)}
-                className="bg-primary hover:bg-primary/90 text-primary-foreground"
-              >
-                <Check className="mr-2 h-4 w-4" /> Prise en charge
-              </Button>
-              <Button
-                onClick={() => setShowFeedbackField(true)}
-                variant="outline"
-                className="border-primary text-primary hover:bg-primary/10"
-              >
-                Affecter à un technicien
-              </Button>
+              {selectedReclamation.status === "envoyer" || selectedReclamation.status === "en attente" ? (
+                <Button
+                  onClick={() => setIsPriseEnChargeOpen(true)}
+                  className="bg-primary hover:bg-primary/90 text-primary-foreground"
+                >
+                  <Check className="mr-2 h-4 w-4" /> Prise en charge
+                </Button>
+              ) : null}
             </div>
           </DialogContent>
         </Dialog>
@@ -687,54 +725,6 @@ export default function ReclamationTable({ data }: { data: Reclamation[] }) {
                 disabled={selectedSuggestion !== "rejetée" || selectedRejectionReasons.length === 0 || isTyping}
               >
                 <X className="mr-2 h-4 w-4" /> Confirmer Rejetée
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
-      )}
-
-      {/* Assign to Employee Dialog */}
-      {showFeedbackField && (
-        <Dialog open={showFeedbackField} onOpenChange={setShowFeedbackField}>
-          <DialogContent className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[90vw] max-w-2xl rounded-lg bg-background text-foreground shadow-lg border border-muted">
-            <DialogHeader>
-              <DialogTitle className="text-2xl font-bold">Affecter à un technicien</DialogTitle>
-              <DialogDescription>
-                Sélectionnez un technicien compétent pour cette réclamation
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4">
-              <Select value={selectedEmployee} onValueChange={setSelectedEmployee}>
-                <SelectTrigger className="w-full bg-background text-foreground">
-                  <SelectValue placeholder="Sélectionner un technicien" />
-                </SelectTrigger>
-                <SelectContent className="bg-background text-foreground">
-                  {employees.map((employee) => (
-                    <SelectItem 
-                      key={employee._id} 
-                      value={employee._id}
-                      className="hover:bg-muted"
-                    >
-                      {employee.firstName} {employee.lastName}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex gap-4 mt-6 justify-end">
-              <Button
-                onClick={() => setShowFeedbackField(false)}
-                variant="outline"
-                className="text-muted-foreground"
-              >
-                Annuler
-              </Button>
-              <Button
-                onClick={handleAssignEmployee}
-                className="bg-primary hover:bg-primary/90 text-primary-foreground"
-                disabled={!selectedEmployee}
-              >
-                Affecter
               </Button>
             </div>
           </DialogContent>

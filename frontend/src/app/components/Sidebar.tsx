@@ -119,7 +119,6 @@ export function Sidebar() {
           </>
         )}
 
-        {/* Other roles remain unchanged */}
         {role === "guichetier" && (
           <>
             <Link href="/guichetier-dashboard/view-reclamations">
@@ -132,20 +131,20 @@ export function Sidebar() {
                 )}
               >
                 <FileSearch className="mr-2 h-4 w-4" />
-                {!isCollapsed && "Voir les Réclamations"}
+                {!isCollapsed && "Lister les Requêtes"}
               </Button>
             </Link>
-            <Link href="/dashboard/manage-transactions">
+            <Link href="/guichetier-dashboard/manage-appointments">
               <Button
                 variant="ghost"
                 size="sm"
                 className={cn(
                   "w-full justify-start rounded-lg border border-transparent hover:border-primary/50 transition-all duration-200",
-                  isActive("/dashboard/manage-transactions") && "border-primary/50 shadow-sm"
+                  isActive("/guichetier-dashboard/manage-appointments") && "border-primary/50 shadow-sm"
                 )}
               >
-                <BookOpen className="mr-2 h-4 w-4" />
-                {!isCollapsed && "Gérer les Transactions"}
+                <Calendar className="mr-2 h-4 w-4" />
+                {!isCollapsed && "Gérer les RDV"}
               </Button>
             </Link>
           </>
@@ -153,30 +152,43 @@ export function Sidebar() {
 
         {role === "employee" && (
           <>
-            <Link href="/dashboard/assign-tasks">
+            <Link href="/employee-dashboard/calendar">
               <Button
                 variant="ghost"
                 size="sm"
                 className={cn(
                   "w-full justify-start rounded-lg border border-transparent hover:border-primary/50 transition-all duration-200",
-                  isActive("/dashboard/assign-tasks") && "border-primary/50 shadow-sm"
-                )}
-              >
-                <FilePlus className="mr-2 h-4 w-4" />
-                {!isCollapsed && "Assigner des Tâches"}
-              </Button>
-            </Link>
-            <Link href="/dashboard/manage-projects">
-              <Button
-                variant="ghost"
-                size="sm"
-                className={cn(
-                  "w-full justify-start rounded-lg border border-transparent hover:border-primary/50 transition-all duration-200",
-                  isActive("/dashboard/manage-projects") && "border-primary/50 shadow-sm"
+                  isActive("/employee-dashboard/calendar") && "border-primary/50 shadow-sm"
                 )}
               >
                 <Calendar className="mr-2 h-4 w-4" />
-                {!isCollapsed && "Gérer les Projets"}
+                {!isCollapsed && "Calendrier"}
+              </Button>
+            </Link>
+            <Link href="/employee-dashboard/view-requests">
+              <Button
+                variant="ghost"
+                size="sm"
+                className={cn(
+                  "w-full justify-start rounded-lg border border-transparent hover:border-primary/50 transition-all duration-200",
+                  isActive("/employee-dashboard/view-requests") && "border-primary/50 shadow-sm"
+                )}
+              >
+                <FileSearch className="mr-2 h-4 w-4" />
+                {!isCollapsed && "Lister les Requêtes"}
+              </Button>
+            </Link>
+            <Link href="/employee-dashboard/manage-appointments">
+              <Button
+                variant="ghost"
+                size="sm"
+                className={cn(
+                  "w-full justify-start rounded-lg border border-transparent hover:border-primary/50 transition-all duration-200",
+                  isActive("/employee-dashboard/manage-appointments") && "border-primary/50 shadow-sm"
+                )}
+              >
+                <Users className="mr-2 h-4 w-4" />
+                {!isCollapsed && "Gérer les Rendez-vous"}
               </Button>
             </Link>
           </>
