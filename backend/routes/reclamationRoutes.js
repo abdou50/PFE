@@ -41,4 +41,5 @@ router.get("/user/:userId/filter", reclamationController.getFilteredReclamations
 
 router.get("/:id", reclamationController.getReclamationById);
 router.delete('/:id', reclamationController.deleteReclamation);
+router.get('/employee/:employeeId', reclamationController.getReclamationsByEmployeeId);
 module.exports = router;

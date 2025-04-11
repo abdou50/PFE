@@ -4,6 +4,8 @@ const cors = require("cors");
 const connectDB = require("./config/db");
 const userRoutes = require("./routes/userRoutes");
 const reclamationRoutes = require("./routes/reclamationRoutes");
+const meetingRoutes = require("./routes/meetingRoutes");
+
 const path = require("path");
 
 dotenv.config();
@@ -24,6 +26,7 @@ app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 app.options("*", cors());
 app.use("/api/users", userRoutes);
 app.use("/api/reclamations", reclamationRoutes);
+app.use("/api/meetings", meetingRoutes);
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));

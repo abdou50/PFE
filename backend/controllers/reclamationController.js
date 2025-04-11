@@ -276,4 +276,32 @@ exports.deleteReclamation = async (req, res) => {
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
+};// Get reclamations by employee ID
+exports.getReclamationsByEmployeeId = async (req, res) => {
+  try {
+    const { employeeId } = req.params;
+    
+    // Find all reclamations assigned to this employee
+    const reclamations = await Reclamation.find({ 
+      employeeId: employeeId,
+      status: { $ne: "brouillant" } // Exclude drafts
+    }).sort({ createdAt: -1 }); // Sort by newest first
+
+    // Format the reclamations with proper file URLs
+    const formattedReclamations = reclamations.map((rec) => ({
+      ...rec._doc,
+      files: constructFileUrls(rec.files),
+    }));
+
+    res.status(200).json({ 
+      msg: "Reclamations retrieved successfully", 
+      data: formattedReclamations 
+    });
+  } catch (err) {
+    console.error("Error fetching reclamations by employee ID:", err);
+    res.status(500).json({ 
+      msg: "Server error", 
+      error: err.message 
+    });
+  }
 };
