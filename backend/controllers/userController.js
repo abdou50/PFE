@@ -1,25 +1,31 @@
 const User = require("../models/User");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+const nodemailer = require('nodemailer');
+const path = require('path');
+const fs = require('fs');
 
-// Login User
+// Helper function for error handling
+const handleError = (res, err, context) => {
+  console.error(`Error in ${context}:`, err.message);
+  res.status(500).json({ msg: "Server error", error: err.message });
+};
+
+// Authentication
 exports.loginUser = async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    // Find user by email
     const user = await User.findOne({ email });
     if (!user) {
       return res.status(400).json({ msg: "Invalid credentials" });
     }
 
-    // Compare passwords
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
       return res.status(400).json({ msg: "Invalid credentials" });
     }
 
-    // Create JWT payload
     const payload = {
       user: {
         userId: user._id,
@@ -33,10 +39,8 @@ exports.loginUser = async (req, res) => {
       },
     };
 
-    // Generate JWT token
     const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: "1h" });
 
-    // Send response to frontend
     res.json({
       token,
       userId: user._id,
@@ -49,145 +53,348 @@ exports.loginUser = async (req, res) => {
       }),
     });
   } catch (err) {
-    console.error("Error in loginUser:", err.message);
-    res.status(500).json({ msg: "Server error" });
+    handleError(res, err, "loginUser");
   }
 };
 
-// Get All Users
-exports.getUsers = async (req, res) => {
-  try {
-    const users = await User.find().select("-password");
-    res.json(users);
-  } catch (err) {
-    console.error("Error in getUsers:", err.message);
-    res.status(500).json({ msg: "Server error" });
+// Configure email transporter (update with your SMTP details)
+// Configure email transporter
+const transporter = nodemailer.createTransport({
+  host: process.env.SMTP_HOST,
+  port: parseInt(process.env.SMTP_PORT),
+  secure: false, // true for 465, false for other ports
+  auth: {
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS
+  },
+  tls: {
+    rejectUnauthorized: false // Add this to avoid self-signed certificate issues
   }
-};
+});
 
-// Get User by ID
-exports.getUserById = async (req, res) => {
-  try {
-    const user = await User.findById(req.params.id).select("-password");
-    if (!user) return res.status(404).json({ msg: "User not found" });
-    res.json(user);
-  } catch (err) {
-    console.error("Error in getUserById:", err.message);
-    res.status(500).json({ msg: "Server error" });
+// Verify transporter connection
+transporter.verify(function(error, success) {
+  if (error) {
+    console.log('SMTP Connection Error:', error);
+  } else {
+    console.log('SMTP Server is ready to take our messages');
   }
-};
+});
 
-// Create User
 exports.createUser = async (req, res) => {
   try {
     const { firstName, lastName, email, password, role, department, ministre, service } = req.body;
 
-    // Check if user already exists
-    let user = await User.findOne({ email });
-    if (user) return res.status(400).json({ msg: "User already exists" });
-
-    // Validate required fields for role "user"
-    if (role === "user") {
-      if (!ministre) {
-        return res.status(400).json({ msg: "Ministre is required for users" });
-      }
-      if (!service) {
-        return res.status(400).json({ msg: "Service is required for users" });
-      }
+    // Validation
+    if (!email || !password) {
+      return res.status(400).json({ msg: "Email and password are required" });
     }
 
-    // Hash password
+    // Validate department for user, employee, and guichetier
+    if (["user", "employee", "guichetier"].includes(role) && !department) {
+      return res.status(400).json({ 
+        msg: "Department is required for users, employees, and guichetiers" 
+      });
+    }
+
+    // Validate ministre and service for users
+    if (role === "user" && (!ministre || !service)) {
+      return res.status(400).json({ 
+        msg: "Ministre and service are required for users" 
+      });
+    }
+
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({ msg: "User already exists" });
+    }
+
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Create new user
-    user = new User({
+    const user = new User({
       firstName,
       lastName,
       email,
       password: hashedPassword,
       role,
-      department,
-      ...(role === "user" && { 
-        ministre,
-        service
-      }),
+      department: ["user", "employee", "guichetier"].includes(role) ? department : undefined,
+      ...(role === "user" && { ministre, service }),
     });
 
-    // Save user to database
     await user.save();
-    res.status(201).json({ msg: "User registered successfully", user });
+    
+    // Send welcome email
+    try {
+      const htmlTemplatePath = path.join(__dirname, '../email-templates/welcome-email.html');
+      let htmlContent = fs.readFileSync(htmlTemplatePath, 'utf8');
+      
+      // Replace placeholders with proper conditional for department
+      htmlContent = htmlContent
+        .replace(/{{firstName}}/g, firstName)
+        .replace(/{{lastName}}/g, lastName)
+        .replace(/{{email}}/g, email)
+        .replace(/{{password}}/g, password)
+        .replace(/{{role}}/g, getFrenchRoleName(role))
+        .replace(/\{\{#if department\}\}.*?\{\{\/if\}\}/gs, department ? `<p><strong>Département :</strong> ${department}</p>` : '')
+        .replace(/{{loginUrl}}/g, process.env.FRONTEND_URL || 'http://localhost:3000');
+
+      const mailOptions = {
+        from: '"Centre National d\'Informatique" <noreply@cni.ma>',
+        to: email,
+        subject: 'Vos identifiants de compte - CNI',
+        html: htmlContent,
+        headers: {
+          'X-Priority': '1',
+          'X-Mailer': 'CNI Mailer'
+        }
+      };
+
+      await transporter.sendMail(mailOptions);
+    } catch (emailError) {
+      console.error('Failed to send welcome email:', emailError);
+      // Don't fail the request if email fails
+    }
+
+    // Return user without password
+    const userResponse = user.toObject();
+    delete userResponse.password;
+    
+    res.status(201).json({ 
+      msg: "User created successfully", 
+      user: userResponse 
+    });
   } catch (err) {
-    console.error("Error in createUser:", err.message);
-    res.status(500).json({ msg: "Server error" });
+    handleError(res, err, "createUser");
   }
 };
 
-// Get employees by department
+// Helper function to translate roles to French
+function getFrenchRoleName(role) {
+  const roles = {
+    admin: "Administrateur",
+    employee: "Technicien",
+    guichetier: "Guichetier",
+    user: "Utilisateur",
+    director: "Directeur"
+  };
+  return roles[role] || role;
+}
+
+exports.getUsers = async (req, res) => {
+  try {
+    const { role, department, sort = "desc" } = req.query;
+    let query = {};
+
+    if (role && role !== 'all') query.role = role;
+    if (department && department !== 'all') query.department = department;
+
+    const sortOrder = sort === "asc" ? 1 : -1;
+    
+    const users = await User.find(query)
+      .select("-password")
+      .sort({ createdAt: sortOrder });
+
+    res.json(users);
+  } catch (err) {
+    handleError(res, err, "getUsers");
+  }
+};
+
+exports.getUserById = async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id).select("-password");
+    if (!user) {
+      return res.status(404).json({ msg: "User not found" });
+    }
+    res.json(user);
+  } catch (err) {
+    handleError(res, err, "getUserById");
+  }
+};
+
+exports.updateUser = async (req, res) => {
+  try {
+    const { firstName, lastName, email, password, role, department, ministre, service } = req.body;
+
+    let user = await User.findById(req.params.id);
+    if (!user) {
+      return res.status(404).json({ msg: "User not found" });
+    }
+
+    // Email change validation
+    if (email && email !== user.email) {
+      const emailExists = await User.findOne({ email });
+      if (emailExists) {
+        return res.status(400).json({ msg: "Email already in use" });
+      }
+      user.email = email;
+    }
+
+    // Update fields
+    user.firstName = firstName || user.firstName;
+    user.lastName = lastName || user.lastName;
+    user.role = role || user.role;
+    user.department = department || user.department;
+
+    // Update password if provided
+    if (password) {
+      user.password = await bcrypt.hash(password, 10);
+    }
+
+    // Handle ministre/service for users
+    if (role === "user") {
+      user.ministre = ministre;
+      user.service = service;
+    } else {
+      user.ministre = undefined;
+      user.service = undefined;
+    }
+
+    await user.save();
+
+    // Return updated user without password
+    const userResponse = user.toObject();
+    delete userResponse.password;
+    
+    res.json({ 
+      msg: "User updated successfully", 
+      user: userResponse 
+    });
+  } catch (err) {
+    handleError(res, err, "updateUser");
+  }
+};
+
+exports.deleteUser = async (req, res) => {
+  try {
+    const userId = req.params.id;
+    const user = await User.findById(userId);
+
+    if (!user) {
+      return res.status(404).json({ msg: "User not found" });
+    }
+
+    // Prevent deletion of last admin
+    if (user.role === 'admin') {
+      const adminCount = await User.countDocuments({ role: 'admin' });
+      if (adminCount <= 1) {
+        return res.status(400).json({ msg: "Cannot delete the last admin user" });
+      }
+    }
+
+    await User.findByIdAndDelete(userId);
+    res.json({ msg: "User deleted successfully", userId });
+  } catch (err) {
+    handleError(res, err, "deleteUser");
+  }
+};
+
+// Specialized Queries
 exports.getEmployeesByDepartment = async (req, res) => {
   try {
     const { department } = req.query;
 
-    // Fetch employees with the same department and role "employee"
-    const employees = await User.find({ department, role: "employee" }).select("-password");
-
-    if (employees.length === 0) {
-      return res.status(404).json({ msg: "No employees found for this department" });
+    if (!department) {
+      return res.status(400).json({ msg: "Department is required" });
     }
 
-    res.status(200).json({ msg: "Employees retrieved successfully", data: employees });
+    const employees = await User.find({ 
+      department, 
+      role: "employee" 
+    }).select("-password");
+
+    res.json({ 
+      msg: "Employees retrieved successfully", 
+      data: employees 
+    });
   } catch (err) {
-    console.error("Error fetching employees by department:", err);
-    res.status(500).json({ msg: "Server error", error: err.message });
+    handleError(res, err, "getEmployeesByDepartment");
   }
 };
 
-// Update User
-exports.updateUser = async (req, res) => {
+exports.getEmployeesWithSchedule = async (req, res) => {
   try {
-    const { firstName, lastName, role, department, ministre, service } = req.body;
-
-    // Validate required fields for role "user"
-    if (role === "user") {
-      if (!ministre) {
-        return res.status(400).json({ msg: "Ministre is required for users" });
-      }
-      if (!service) {
-        return res.status(400).json({ msg: "Service is required for users" });
-      }
+    const { department, date } = req.query;
+    
+    if (!department) {
+      return res.status(400).json({ error: "Department is required" });
     }
 
-    // Find and update user
-    const user = await User.findByIdAndUpdate(
-      req.params.id,
+    const employees = await User.aggregate([
       { 
-        firstName, 
-        lastName, 
-        role, 
-        department,
-        ...(role === "user" && { 
-          ministre,
-          service
-        })
+        $match: { 
+          department,
+          role: 'employee'
+        } 
       },
-      { new: true }
-    );
+      {
+        $lookup: {
+          from: "meetings",
+          let: { employeeId: "$_id" },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $and: [
+                    { $eq: ["$employeeId", "$$employeeId"] },
+                    { $eq: ["$status", "Planifié"] },
+                    date ? { 
+                      $eq: [
+                        { $dateToString: { format: "%Y-%m-%d", date: "$date" } },
+                        { $dateToString: { format: "%Y-%m-%d", date: new Date(date) } }
+                      ]
+                    } : {}
+                  ]
+                }
+              }
+            },
+            { $sort: { date: 1 } }
+          ],
+          as: "meetings"
+        }
+      },
+      { $project: { password: 0 } }
+    ]);
 
-    if (!user) return res.status(404).json({ msg: "User not found" });
-    res.json({ msg: "User updated successfully", user });
+    res.json(employees);
   } catch (err) {
-    console.error("Error in updateUser:", err.message);
-    res.status(500).json({ msg: "Server error" });
+    handleError(res, err, "getEmployeesWithSchedule");
   }
 };
 
-// Delete User
-exports.deleteUser = async (req, res) => {
+// Data Export
+exports.exportUsers = async (req, res) => {
   try {
-    const user = await User.findByIdAndDelete(req.params.id);
-    if (!user) return res.status(404).json({ msg: "User not found" });
-    res.json({ msg: "User deleted successfully" });
+    const users = await User.find().select('-password').lean();
+    
+    // CSV Header
+    let csv = 'Nom,Prénom,Email,Rôle,Produit CNI,Ministre,Service,Date création\n';
+    
+    // CSV Rows
+    users.forEach(user => {
+      csv += `"${user.lastName}","${user.firstName}","${user.email}",` +
+             `"${translateRole(user.role)}",` +
+             `"${user.department}",` +
+             `"${user.ministre || ''}","${user.service || ''}",` +
+             `"${new Date(user.createdAt).toLocaleDateString('fr-FR')}"\n`;
+    });
+
+    res.header('Content-Type', 'text/csv');
+    res.attachment('utilisateurs.csv');
+    return res.send(csv);
   } catch (err) {
-    console.error("Error in deleteUser:", err.message);
-    res.status(500).json({ msg: "Server error" });
+    handleError(res, err, "exportUsers");
   }
 };
+
+// Helper function for role translation
+function translateRole(role) {
+  const roles = {
+    admin: "Administrateur",
+    employee: "Technicien",
+    guichetier: "Guichetier",
+    user: "Utilisateur",
+    director: "Directeur"
+  };
+  return roles[role] || role;
+}

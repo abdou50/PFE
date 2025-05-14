@@ -12,7 +12,12 @@ const MeetingSchema = new mongoose.Schema({
     type: String,
     enum: ["Demandé", "Planifié", "Terminé", "Annulé"],
     default: "Demandé"
-  }
-}, { timestamps: true });
+  },
+  meetingLink: {
+    type: String,
+    default: ""
+  },
+  employeeId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
+}); { timestamps: true };
 
 module.exports = mongoose.model("Meeting", MeetingSchema);

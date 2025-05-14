@@ -5,6 +5,9 @@ const connectDB = require("./config/db");
 const userRoutes = require("./routes/userRoutes");
 const reclamationRoutes = require("./routes/reclamationRoutes");
 const meetingRoutes = require("./routes/meetingRoutes");
+const statsRoutes = require('./routes/statsRoutes');
+
+
 
 const path = require("path");
 
@@ -27,6 +30,7 @@ app.options("*", cors());
 app.use("/api/users", userRoutes);
 app.use("/api/reclamations", reclamationRoutes);
 app.use("/api/meetings", meetingRoutes);
+app.use('/api/stats', statsRoutes);
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));

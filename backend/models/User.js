@@ -13,7 +13,9 @@ const UserSchema = new mongoose.Schema({
   department: { 
     type: String, 
     enum: ["Madaniya", "Insaf", "Rached"], 
-    required: true 
+    required: function() { 
+      return ["user", "employee", "guichetier"].includes(this.role);
+    }
   },
   ministre: { 
     type: String, 

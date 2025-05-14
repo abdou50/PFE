@@ -2,6 +2,7 @@
 const Reclamation = require("../models/Reclamation");
 const fs = require("fs");
 const path = require("path");
+const nodemailer = require('nodemailer');
 
 // Helper function to construct file URLs
 const constructFileUrls = (files) => {
@@ -82,8 +83,12 @@ exports.updateReclamation = async (req, res) => {
     const { title, description, filesToDelete, status, guichetierId, feedback, employeeId } = req.body;
     const newFiles = req.files ? req.files.map((file) => `/uploads/reclamations/${id}/${file.filename}`) : [];
 
-    // Find the existing reclamation
-    const existingReclamation = await Reclamation.findById(id);
+    // Find the existing reclamation and populate user details
+    const existingReclamation = await Reclamation.findById(id).populate({
+      path: 'userId',
+      select: 'firstName lastName email'
+    });
+    
     if (!existingReclamation) {
       return res.status(404).json({ msg: "Reclamation not found" });
     }
@@ -125,19 +130,105 @@ exports.updateReclamation = async (req, res) => {
     // Update fields
     existingReclamation.title = title || existingReclamation.title;
     existingReclamation.description = description || existingReclamation.description;
-    existingReclamation.status = status || existingReclamation.status; // Update status if provided
-    existingReclamation.guichetierId = guichetierId || existingReclamation.guichetierId; // Update guichetierId if provided
-    existingReclamation.feedback = feedback || existingReclamation.feedback; // Update feedback if provided
-    existingReclamation.employeeId = employeeId || existingReclamation.employeeId; // Update employeeId if provided
+    existingReclamation.status = status || existingReclamation.status;
+    if (guichetierId) existingReclamation.guichetierId = guichetierId;
+    if (employeeId) existingReclamation.employeeId = employeeId;
+    if (feedback) existingReclamation.feedback = feedback;
 
-    // Save updated reclamation
+    // Check if status change requires email
+    const isStatusChangeRequiringEmail = 
+      (status === "en attente" || status === "traitée" || status === "rejetée") &&
+      feedback &&
+      existingReclamation.userId?.email;
+
     const updatedReclamation = await existingReclamation.save();
 
-    // Return updated data to frontend
-    res.status(200).json({
-      msg: "Reclamation updated successfully",
-      data: updatedReclamation,
-    });
+    // Send email for status changes with feedback
+    if (isStatusChangeRequiringEmail) {
+      try {
+        const transporter = nodemailer.createTransport({
+          service: 'gmail',
+          host: process.env.SMTP_HOST,
+          port: parseInt(process.env.SMTP_PORT),
+          auth: {
+            user: process.env.SMTP_USER,
+            pass: process.env.SMTP_PASS
+          }
+        });
+
+        const statusColor = {
+          'en attente': '#ffa500',
+          'traitée': '#28a745',
+          'rejetée': '#dc3545'
+        };
+
+        const statusMessage = {
+          'en attente': 'Votre réclamation a été prise en charge',
+          'traitée': 'Votre réclamation a été traitée',
+          'rejetée': 'Votre réclamation a été rejetée'
+        };
+
+        const emailTemplate = `
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <style>
+              body { font-family: Arial, sans-serif; line-height: 1.6; }
+              .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+              .header { background-color: #f8f9fa; padding: 20px; text-align: center; }
+              .content { padding: 20px; }
+              .status { 
+                display: inline-block; 
+                padding: 5px 10px; 
+                border-radius: 4px; 
+                color: white;
+                background-color: ${statusColor[status]};
+              }
+            </style>
+          </head>
+          <body>
+            <div class="container">
+              <div class="header">
+                <h2>CNI - Mise à jour de votre réclamation</h2>
+              </div>
+              <div class="content">
+                <p>Bonjour ${existingReclamation.userId.firstName} ${existingReclamation.userId.lastName},</p>
+                <p>${statusMessage[status]}</p>
+                <p><strong>Référence:</strong> ${existingReclamation._id}</p>
+                <p><strong>Titre:</strong> ${existingReclamation.title}</p>
+                <p><strong>Nouveau statut:</strong> <span class="status">${status.toUpperCase()}</span></p>
+                <h3>Message:</h3>
+                <p>${feedback}</p>
+                <p>Cordialement,<br>L'équipe CNI</p>
+              </div>
+            </div>
+          </body>
+          </html>
+        `;
+
+        await transporter.sendMail({
+          from: {
+            name: 'CNI Service Réclamations',
+            address: process.env.SMTP_USER
+          },
+          to: existingReclamation.userId.email,
+          subject: `[CNI] ${statusMessage[status]}`,
+          html: emailTemplate
+        });
+
+        console.log('Email sent successfully to:', existingReclamation.userId.email);
+      } catch (emailError) {
+        console.error('Email sending failed:', emailError.message);
+      }
+    }
+    
+    // Populate the user details before sending response
+    const populatedReclamation = await Reclamation.findById(updatedReclamation._id)
+      .populate('employeeId', 'firstName lastName _id')
+      .populate('guichetierId', 'firstName lastName _id')
+      .populate('userId', 'firstName lastName email');
+
+    res.json(populatedReclamation);
   } catch (err) {
     console.error("Error updating reclamation:", err);
     res.status(500).json({ msg: "Server error", error: err.message });
@@ -181,6 +272,7 @@ exports.getReclamationsByDepartment = async (req, res) => {
 };
 
 // Update reclamation status
+// Update the updateStatus function
 exports.updateStatus = async (req, res) => {
   try {
     const { id } = req.params;
@@ -192,29 +284,121 @@ exports.updateStatus = async (req, res) => {
       return res.status(400).json({ msg: "Invalid status provided" });
     }
 
-    // Find the reclamation by ID and update its status
-    const updatedReclamation = await Reclamation.findByIdAndUpdate(
-      id,
-      {
-        status,
-        feedback: status === "rejetée" || status === "traitée" ? feedback : undefined,
-        guichetierId: status === "en attente" ? guichetierId : undefined,
-        employeeId: status === "en attente" ? employeeId : undefined,
-      },
-      { new: true }
-    );
-
-    if (!updatedReclamation) {
+    // Find the reclamation and populate user details with email
+    const reclamation = await Reclamation.findById(id)
+      .populate({
+        path: 'userId',
+        select: 'firstName lastName email'
+      });
+    
+    if (!reclamation) {
       return res.status(404).json({ msg: "Reclamation not found" });
     }
 
-    res.status(200).json({ msg: "Reclamation status updated successfully", data: updatedReclamation });
+    // Check if status is changing to "en attente", "traitée" or "rejetée" and has feedback
+    const isStatusChangeRequiringEmail = 
+      (status === "en attente" || status === "traitée" || status === "rejetée") &&
+      feedback &&
+      reclamation.userId?.email;
+
+    // Update the reclamation
+    reclamation.status = status;
+    reclamation.feedback = feedback || reclamation.feedback;
+    reclamation.guichetierId = status === "en attente" ? guichetierId : reclamation.guichetierId;
+    reclamation.employeeId = status === "en attente" ? employeeId : reclamation.employeeId;
+
+    const updatedReclamation = await reclamation.save();
+
+    // Send email for status changes with feedback
+    if (isStatusChangeRequiringEmail) {
+      try {
+        const transporter = nodemailer.createTransport({
+          service: 'gmail',
+          host: process.env.SMTP_HOST,
+          port: parseInt(process.env.SMTP_PORT),
+          auth: {
+            user: process.env.SMTP_USER,
+            pass: process.env.SMTP_PASS
+          }
+        });
+
+        // Customize email template based on status
+        const statusColor = {
+          'en attente': '#ffa500',  // Orange for in progress
+          'traitée': '#28a745',     // Green for treated
+          'rejetée': '#dc3545'      // Red for rejected
+        };
+
+        const statusMessage = {
+          'en attente': 'Votre réclamation a été prise en charge',
+          'traitée': 'Votre réclamation a été traitée',
+          'rejetée': 'Votre réclamation a été rejetée'
+        };
+
+        const emailTemplate = `
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <style>
+              body { font-family: Arial, sans-serif; line-height: 1.6; }
+              .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+              .header { background-color: #f8f9fa; padding: 20px; text-align: center; }
+              .content { padding: 20px; }
+              .status { 
+                display: inline-block; 
+                padding: 5px 10px; 
+                border-radius: 4px; 
+                color: white;
+                background-color: ${statusColor[status]};
+              }
+            </style>
+          </head>
+          <body>
+            <div class="container">
+              <div class="header">
+                <h2>CNI - Mise à jour de votre réclamation</h2>
+              </div>
+              <div class="content">
+                <p>Bonjour ${reclamation.userId.firstName} ${reclamation.userId.lastName},</p>
+                <p>${statusMessage[status]}</p>
+                <p><strong>Référence:</strong> ${reclamation._id}</p>
+                <p><strong>Titre:</strong> ${reclamation.title}</p>
+                <p><strong>Nouveau statut:</strong> <span class="status">${status.toUpperCase()}</span></p>
+                <h3>Message:</h3>
+                <p>${feedback}</p>
+                <p>Cordialement,<br>L'équipe CNI</p>
+              </div>
+            </div>
+          </body>
+          </html>
+        `;
+
+        await transporter.sendMail({
+          from: {
+            name: 'CNI Service Réclamations',
+            address: process.env.SMTP_USER
+          },
+          to: reclamation.userId.email,
+          subject: `[CNI] ${statusMessage[status]}`,
+          html: emailTemplate
+        });
+
+        console.log('Email sent successfully to:', reclamation.userId.email);
+      } catch (emailError) {
+        console.error('Email sending failed:', emailError.message);
+      }
+    }
+
+    res.status(200).json({ 
+      msg: "Reclamation status updated successfully", 
+      data: updatedReclamation,
+      emailSent: isStatusChangeRequiringEmail
+    });
   } catch (err) {
-    console.error("Error updating reclamation status:", err);
+    console.error('Error in updateStatus:', err);
     res.status(500).json({ msg: "Server error", error: err.message });
   }
 };
-
 // Get filtered reclamations by user ID, type, and status
 exports.getFilteredReclamations = async (req, res) => {
   try {
@@ -262,6 +446,21 @@ exports.getReclamationById = async (req, res) => {
     res.status(200).json({ msg: "Reclamation retrieved successfully", data: formattedReclamation });
   } catch (err) {
     console.error("Error fetching reclamation:", err);
+    res.status(500).json({ msg: "Server error", error: err.message });
+  }
+};
+// Get all reclamations with populated user details
+exports.getAllReclamations = async (req, res) => {
+  try {
+    const reclamations = await Reclamation.find()
+      .populate('userId', 'firstName lastName email')
+      .populate('employeeId', 'firstName lastName')
+      .populate('guichetierId', 'firstName lastName')
+      .sort({ createdAt: -1 });
+
+    res.json(reclamations);
+  } catch (err) {
+    console.error("Error fetching reclamations:", err);
     res.status(500).json({ msg: "Server error", error: err.message });
   }
 };
