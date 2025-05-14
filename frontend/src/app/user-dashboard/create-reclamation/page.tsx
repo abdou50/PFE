@@ -7,8 +7,30 @@ import { Textarea } from "@/components/ui/textarea";
 import { Toaster, toast } from "react-hot-toast";
 import axios from "axios";
 import { pdf } from "@react-pdf/renderer";
-import ReclamationPDF from "../../components/ReclamationPDF"; // Import the PDF component
+import ReclamationPDF from "../../components/ReclamationPDF";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+
+// Define department-specific object options
+const departmentOptions = {
+  Madaniya: [
+    "Madaniya 1",
+    "Madaniya 2",
+    "Madaniya 3",
+    "Madaniya 4",
+  ],
+  Insaf: [
+    "Validation des décisions d'avancement collectif",
+    "Changer le mot de passe",
+    "Ajouter une procédure ou Ajouter une action",
+    "Annulation d'une décision d'absence injustifiée"
+  ],
+  Rached: [
+    "Demande de formation",
+    "Signalement technique",
+    "Demande d'équipement",
+    "Problème de réseau"
+  ]
+};
 
 export default function CreateReclamationPage() {
   const [firstName, setFirstName] = useState<string>("");
@@ -26,23 +48,38 @@ export default function CreateReclamationPage() {
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [isConfirmationOpen, setIsConfirmationOpen] = useState(false);
   const [actionType, setActionType] = useState<"envoyer" | "brouillant">("envoyer");
+  const [objectOptions, setObjectOptions] = useState<string[]>([]);
 
   // Load initial data from localStorage
   useEffect(() => {
     if (typeof window !== "undefined") {
       const storedService = localStorage.getItem("service");
+      const storedDepartment = localStorage.getItem("department") || "";
+      
       if (!storedService) {
         toast.error("Service information is missing. Please log in again.");
-        // Optionally redirect to login
-        // router.push('/login');
       }
+
       setFirstName(localStorage.getItem("firstName") || "");
-      setDepartment(localStorage.getItem("department") || "");
+      setDepartment(storedDepartment);
       setUserId(localStorage.getItem("userId") || "");
       setMinistre(localStorage.getItem("ministre") || "");
-      setService(storedService || ""); // This will ensure service is set
+      setService(storedService || "");
+
+      // Set initial object options based on department
+      if (storedDepartment && departmentOptions[storedDepartment as keyof typeof departmentOptions]) {
+        setObjectOptions(departmentOptions[storedDepartment as keyof typeof departmentOptions]);
+      }
     }
   }, []);
+
+  // Update object options when department changes
+  useEffect(() => {
+    if (department && departmentOptions[department as keyof typeof departmentOptions]) {
+      setObjectOptions(departmentOptions[department as keyof typeof departmentOptions]);
+      setTitle({ text: "", type: "" }); // Reset title when department changes
+    }
+  }, [department]);
 
   // Handle file upload
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -65,7 +102,7 @@ export default function CreateReclamationPage() {
       setter(text.slice(0, index));
       index++;
       if (index > text.length) clearInterval(interval);
-    }, 20); // Adjust typing speed here
+    }, 20);
   };
 
   // Handle AI-generated description
@@ -78,7 +115,6 @@ export default function CreateReclamationPage() {
     setIsGenerating(true);
 
     try {
-      // Combine default information and user-provided keywords
       const prompt = `Rédige un texte descriptif pour une ${type}
                      
                     Le texte doit être court et concis, et doit inclure les informations suivantes :
@@ -94,7 +130,7 @@ export default function CreateReclamationPage() {
             {
               parts: [
                 {
-                  text: prompt, // Use the combined prompt
+                  text: prompt,
                 },
               ],
             },
@@ -102,10 +138,10 @@ export default function CreateReclamationPage() {
         },
         {
           params: {
-            key: process.env.NEXT_PUBLIC_GEMINI_API_KEY, // Use environment variable
+            key: process.env.NEXT_PUBLIC_GEMINI_API_KEY,
           },
           headers: {
-            "Content-Type": "application/json", // Set the content type
+            "Content-Type": "application/json",
           },
         }
       );
@@ -148,11 +184,10 @@ export default function CreateReclamationPage() {
     formData.append("titleType", title.type);
     formData.append("ministre", ministre);
     formData.append("description", description);
-    formData.append("status", actionType); // Use the selected action type
+    formData.append("status", actionType);
 
-    // Append multiple files
     file.forEach((f) => {
-      formData.append("files", f); // "files" doit correspondre au nom attendu par Multer
+      formData.append("files", f);
     });
 
     try {
@@ -165,9 +200,8 @@ export default function CreateReclamationPage() {
         toast.success("Réclamation créée avec succès !");
         setTitle({ text: "", type: "" });
         setDescription("");
-        setFile([]); // Set an empty array instead of null
+        setFile([]);
 
-        // Open confirmation dialog for PDF download
         setIsConfirmationOpen(true);
       } else {
         const errorMsg = await response.text();
@@ -180,7 +214,7 @@ export default function CreateReclamationPage() {
     }
   };
 
-  // Handle saving locally (without sending to the database)
+  // Handle saving locally
   const handleSaveLocally = async () => {
     if (!title.text || !description) {
       toast.error("Veuillez remplir tous les champs obligatoires.");
@@ -197,11 +231,10 @@ export default function CreateReclamationPage() {
     formData.append("titleType", title.type);
     formData.append("ministre", ministre);
     formData.append("description", description);
-    formData.append("status", "brouillant"); // Ensure the status is "brouillant"
+    formData.append("status", "brouillant");
 
-    // Append multiple files
     file.forEach((f) => {
-      formData.append("files", f); // "files" doit correspondre au nom attendu par Multer
+      formData.append("files", f);
     });
 
     try {
@@ -212,8 +245,6 @@ export default function CreateReclamationPage() {
 
       if (response.ok) {
         toast.success("Réclamation enregistrée avec succès !");
-
-        // Open confirmation dialog for PDF download
         setIsConfirmationOpen(true);
       } else {
         const errorMsg = await response.text();
@@ -228,7 +259,7 @@ export default function CreateReclamationPage() {
   const handleCancel = () => {
     setTitle({ text: "", type: "" });
     setDescription("");
-    setFile([]); // Fix: Set an empty array instead of null
+    setFile([]);
     toast.success("Formulaire annulé.");
   };
 
@@ -261,12 +292,12 @@ export default function CreateReclamationPage() {
       <form onSubmit={handleSubmit} className="space-y-4 flex-1">
         <div className="space-y-2">
           <Label>Prénom</Label>
-          <Input value={firstName} readOnly /> {/* Pre-filled from login */}
+          <Input value={firstName} readOnly />
         </div>
         
         <div className="space-y-2">
           <Label>Produit Cni</Label>
-          <Input value={department} readOnly /> {/* Pre-filled from login */}
+          <Input value={department} readOnly />
         </div>
 
         <div className="space-y-2">
@@ -283,19 +314,29 @@ export default function CreateReclamationPage() {
 
         <div className="space-y-2">
           <Label>Ministère</Label>
-          <Input value={ministre} readOnly /> {/* Pre-filled from login */}
+          <Input value={ministre} readOnly />
         </div>
+        
         <div className="space-y-2">
-           <Label>Service</Label>
-           <Input value={service} readOnly /> {/* Pre-filled from login */}
-         </div>
+          <Label>Service</Label>
+          <Input value={service} readOnly />
+        </div>
+        
         <div className="space-y-2">
           <Label>Object</Label>
-          <Input 
-            value={title.text} 
-            onChange={(e) => setTitle({ ...title, text: e.target.value })} 
-            required 
-          />
+          <select
+            value={title.text}
+            onChange={(e) => setTitle({ ...title, text: e.target.value })}
+            className="w-full p-2 border rounded bg-background text-foreground"
+            required
+          >
+            <option value="">Sélectionnez un objet</option>
+            {objectOptions.map((option, index) => (
+              <option key={index} value={option}>
+                {option}
+              </option>
+            ))}
+          </select>
         </div>
 
         <div className="space-y-2">
@@ -340,6 +381,7 @@ export default function CreateReclamationPage() {
             />
           )}
         </div>
+        
         <div className="space-y-2">
           <Label>Joindre un fichier (PDF ou image, optionnel)</Label>
           <Input 
@@ -393,7 +435,6 @@ export default function CreateReclamationPage() {
         </div>
       </form>
 
-      {/* Confirmation Dialog for PDF Download */}
       <Dialog open={isConfirmationOpen} onOpenChange={setIsConfirmationOpen}>
         <DialogContent>
           <DialogHeader>

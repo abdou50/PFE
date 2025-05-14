@@ -80,7 +80,16 @@ const TYPE_TRANSLATIONS = {
   "Reclamation": "Réclamation",
 };
 
-export default function ReclamationTable({ data }: { data: Reclamation[] }) {
+// Add to props type
+export default function ReclamationTable({ 
+  data, 
+  sortOrder, 
+  onSortChange 
+}: { 
+  data: Reclamation[]; 
+  sortOrder: "asc" | "desc";
+  onSortChange: (order: "asc" | "desc") => void;
+}) {
   const { theme } = useTheme();
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(5);

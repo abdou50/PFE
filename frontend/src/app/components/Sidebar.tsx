@@ -1,15 +1,15 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation"; // To detect the active route
-import { Home, FilePlus, Calendar, FileSearch, Users, Settings, BookOpen, Menu } from "lucide-react";
+import { usePathname } from "next/navigation";
+import { Home, FilePlus, Calendar, FileSearch, Users, Settings, BookOpen, Menu, PieChart, Building, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils"; // Utility for conditional class names
+import { cn } from "@/lib/utils";
 
 export function Sidebar() {
   const [role, setRole] = useState<null | string>(null);
-  const [isCollapsed, setIsCollapsed] = useState(false); // State for sidebar collapse
-  const pathname = usePathname(); // Get the current route
+  const [isCollapsed, setIsCollapsed] = useState(false);
+  const pathname = usePathname();
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -18,7 +18,6 @@ export function Sidebar() {
     }
   }, []);
 
-  // Function to check if a link is active
   const isActive = (href: string) => pathname === href;
 
   return (
@@ -40,23 +39,23 @@ export function Sidebar() {
 
       {/* Menu Items */}
       <div className="space-y-1">
-        {/* Liste de Requêtes */}
-        <Link href="/user-dashboard">
-          <Button
-            variant="ghost"
-            size="sm"
-            className={cn(
-              "w-full justify-start rounded-lg border border-transparent hover:border-primary/50 transition-all duration-200",
-              isActive("/user-dashboard") && "border-primary/50 shadow-sm"
-            )}
-          >
-            <Home className="mr-2 h-4 w-4" />
-            {!isCollapsed && "Liste de Requêtes"}
-          </Button>
-        </Link>
-
         {role === "user" && (
           <>
+            {/* Liste de Requêtes */}
+            <Link href="/user-dashboard">
+              <Button
+                variant="ghost"
+                size="sm"
+                className={cn(
+                  "w-full justify-start rounded-lg border border-transparent hover:border-primary/50 transition-all duration-200",
+                  isActive("/user-dashboard") && "border-primary/50 shadow-sm"
+                )}
+              >
+                <Home className="mr-2 h-4 w-4" />
+                {!isCollapsed && "Liste de Requêtes"}
+              </Button>
+            </Link>
+
             {/* Nouvelle Requête */}
             <Link href="/user-dashboard/create-reclamation">
               <Button
@@ -121,17 +120,17 @@ export function Sidebar() {
 
         {role === "guichetier" && (
           <>
-            <Link href="/guichetier-dashboard/view-reclamations">
+            <Link href="/guichetier-dashboard">
               <Button
                 variant="ghost"
                 size="sm"
                 className={cn(
                   "w-full justify-start rounded-lg border border-transparent hover:border-primary/50 transition-all duration-200",
-                  isActive("/guichetier-dashboard/view-reclamations") && "border-primary/50 shadow-sm"
+                  isActive("/guichetier-dashboard") && "border-primary/50 shadow-sm"
                 )}
               >
-                <FileSearch className="mr-2 h-4 w-4" />
-                {!isCollapsed && "Lister les Requêtes"}
+                <Home className="mr-2 h-4 w-4" />
+                {!isCollapsed && "Tableau de Bord"}
               </Button>
             </Link>
             <Link href="/guichetier-dashboard/manage-appointments">
@@ -144,7 +143,7 @@ export function Sidebar() {
                 )}
               >
                 <Calendar className="mr-2 h-4 w-4" />
-                {!isCollapsed && "Gérer les RDV"}
+                {!isCollapsed && "Gestion des RDV"}
               </Button>
             </Link>
           </>
@@ -152,30 +151,17 @@ export function Sidebar() {
 
         {role === "employee" && (
           <>
-            <Link href="/employee-dashboard/calendar">
+            <Link href="/employee-dashboard">
               <Button
                 variant="ghost"
                 size="sm"
                 className={cn(
                   "w-full justify-start rounded-lg border border-transparent hover:border-primary/50 transition-all duration-200",
-                  isActive("/employee-dashboard/calendar") && "border-primary/50 shadow-sm"
+                  isActive("/employee-dashboard") && "border-primary/50 shadow-sm"
                 )}
               >
-                <Calendar className="mr-2 h-4 w-4" />
-                {!isCollapsed && "Calendrier"}
-              </Button>
-            </Link>
-            <Link href="/employee-dashboard/view-requests">
-              <Button
-                variant="ghost"
-                size="sm"
-                className={cn(
-                  "w-full justify-start rounded-lg border border-transparent hover:border-primary/50 transition-all duration-200",
-                  isActive("/employee-dashboard/view-requests") && "border-primary/50 shadow-sm"
-                )}
-              >
-                <FileSearch className="mr-2 h-4 w-4" />
-                {!isCollapsed && "Lister les Requêtes"}
+                <Home className="mr-2 h-4 w-4" />
+                {!isCollapsed && "Tableau de Bord"}
               </Button>
             </Link>
             <Link href="/employee-dashboard/manage-appointments">
@@ -187,8 +173,8 @@ export function Sidebar() {
                   isActive("/employee-dashboard/manage-appointments") && "border-primary/50 shadow-sm"
                 )}
               >
-                <Users className="mr-2 h-4 w-4" />
-                {!isCollapsed && "Gérer les Rendez-vous"}
+                <Calendar className="mr-2 h-4 w-4" />
+                {!isCollapsed && "Gestion des RDV"}
               </Button>
             </Link>
           </>
@@ -196,30 +182,56 @@ export function Sidebar() {
 
         {role === "admin" && (
           <>
-            <Link href="/dashboard/manage-users">
+            <Link href="/admin-dashboard">
               <Button
                 variant="ghost"
                 size="sm"
                 className={cn(
                   "w-full justify-start rounded-lg border border-transparent hover:border-primary/50 transition-all duration-200",
-                  isActive("/dashboard/manage-users") && "border-primary/50 shadow-sm"
+                  isActive("/admin-dashboard") && "border-primary/50 shadow-sm"
+                )}
+              >
+                <Home className="mr-2 h-4 w-4" />
+                {!isCollapsed && "Tableau de Bord"}
+              </Button>
+            </Link>
+            <Link href="/admin-dashboard/departments">
+              <Button
+                variant="ghost"
+                size="sm"
+                className={cn(
+                  "w-full justify-start rounded-lg border border-transparent hover:border-primary/50 transition-all duration-200",
+                  isActive("/admin-dashboard/departments") && "border-primary/50 shadow-sm"
+                )}
+              >
+                <Building className="mr-2 h-4 w-4" />
+                {!isCollapsed && "Départements"}
+              </Button>
+            </Link>
+            <Link href="/admin-dashboard/manage-users">
+              <Button
+                variant="ghost"
+                size="sm"
+                className={cn(
+                  "w-full justify-start rounded-lg border border-transparent hover:border-primary/50 transition-all duration-200",
+                  isActive("/admin-dashboard/manage-users") && "border-primary/50 shadow-sm"
                 )}
               >
                 <Users className="mr-2 h-4 w-4" />
-                {!isCollapsed && "Gérer les Utilisateurs"}
+                {!isCollapsed && "Gestion Utilisateurs"}
               </Button>
             </Link>
-            <Link href="/dashboard/system-settings">
+            <Link href="/admin-dashboard/stats">
               <Button
                 variant="ghost"
                 size="sm"
                 className={cn(
                   "w-full justify-start rounded-lg border border-transparent hover:border-primary/50 transition-all duration-200",
-                  isActive("/dashboard/system-settings") && "border-primary/50 shadow-sm"
+                  isActive("/admin-dashboard/stats") && "border-primary/50 shadow-sm"
                 )}
               >
-                <Settings className="mr-2 h-4 w-4" />
-                {!isCollapsed && "Paramètres du Système"}
+                <PieChart className="mr-2 h-4 w-4" />
+                {!isCollapsed && "Statistiques"}
               </Button>
             </Link>
           </>
@@ -227,30 +239,43 @@ export function Sidebar() {
 
         {role === "director" && (
           <>
-            <Link href="/dashboard/view-reports">
+            <Link href="/director-dashboard">
               <Button
                 variant="ghost"
                 size="sm"
                 className={cn(
                   "w-full justify-start rounded-lg border border-transparent hover:border-primary/50 transition-all duration-200",
-                  isActive("/dashboard/view-reports") && "border-primary/50 shadow-sm"
+                  isActive("/director-dashboard") && "border-primary/50 shadow-sm"
                 )}
               >
-                <FileSearch className="mr-2 h-4 w-4" />
-                {!isCollapsed && "Voir les Rapports"}
+                <Home className="mr-2 h-4 w-4" />
+                {!isCollapsed && "Tableau de Bord"}
               </Button>
             </Link>
-            <Link href="/dashboard/approve-budgets">
+            <Link href="/director-dashboard/reports">
               <Button
                 variant="ghost"
                 size="sm"
                 className={cn(
                   "w-full justify-start rounded-lg border border-transparent hover:border-primary/50 transition-all duration-200",
-                  isActive("/dashboard/approve-budgets") && "border-primary/50 shadow-sm"
+                  isActive("/director-dashboard/reports") && "border-primary/50 shadow-sm"
                 )}
               >
-                <BookOpen className="mr-2 h-4 w-4" />
-                {!isCollapsed && "Approuver les Budgets"}
+                <FileText className="mr-2 h-4 w-4" />
+                {!isCollapsed && "Rapports"}
+              </Button>
+            </Link>
+            <Link href="/director-dashboard/stats">
+              <Button
+                variant="ghost"
+                size="sm"
+                className={cn(
+                  "w-full justify-start rounded-lg border border-transparent hover:border-primary/50 transition-all duration-200",
+                  isActive("/director-dashboard/stats") && "border-primary/50 shadow-sm"
+                )}
+              >
+                <PieChart className="mr-2 h-4 w-4" />
+                {!isCollapsed && "Statistiques"}
               </Button>
             </Link>
           </>
