@@ -432,7 +432,31 @@ exports.getFilteredReclamations = async (req, res) => {
 exports.getReclamationById = async (req, res) => {
   try {
     const { id } = req.params;
-    const reclamation = await Reclamation.findById(id);
+
+    // Special case for "all" - return all reclamations
+    if (id === "all") {
+      const reclamations = await Reclamation.find()
+        .populate('userId', 'firstName lastName email')
+        .populate('employeeId', 'firstName lastName')
+        .populate('guichetierId', 'firstName lastName')
+        .sort({ createdAt: -1 });
+
+      const formattedReclamations = reclamations.map(rec => ({
+        ...rec._doc,
+        files: constructFileUrls(rec.files),
+      }));
+
+      return res.status(200).json({
+        msg: "All reclamations retrieved successfully",
+        data: formattedReclamations
+      });
+    }
+
+    // Regular case - find by ID
+    const reclamation = await Reclamation.findById(id)
+      .populate('userId', 'firstName lastName email')
+      .populate('employeeId', 'firstName lastName')
+      .populate('guichetierId', 'firstName lastName');
 
     if (!reclamation) {
       return res.status(404).json({ msg: "Reclamation not found" });
@@ -440,7 +464,7 @@ exports.getReclamationById = async (req, res) => {
 
     const formattedReclamation = {
       ...reclamation._doc,
-      files: constructFileUrls(reclamation.files), // Construct full URLs for files
+      files: constructFileUrls(reclamation.files),
     };
 
     res.status(200).json({ msg: "Reclamation retrieved successfully", data: formattedReclamation });
@@ -458,7 +482,15 @@ exports.getAllReclamations = async (req, res) => {
       .populate('guichetierId', 'firstName lastName')
       .sort({ createdAt: -1 });
 
-    res.json(reclamations);
+    const formattedReclamations = reclamations.map(rec => ({
+      ...rec._doc,
+      files: constructFileUrls(rec.files),
+    }));
+
+    res.status(200).json({
+      msg: "All reclamations retrieved successfully",
+      data: formattedReclamations
+    });
   } catch (err) {
     console.error("Error fetching reclamations:", err);
     res.status(500).json({ msg: "Server error", error: err.message });

@@ -313,3 +313,182 @@ exports.getGuichetierPerformance = async (filter = {}, limit = 10) => {
     { $limit: limit }
   ]);
 };
+
+exports.generateReport = async (req, res) => {
+  try {
+    const { startDate, endDate, department, reportType } = req.query;
+    
+    const filter = {};
+    
+    if (startDate && endDate) {
+      filter.createdAt = {
+        $gte: new Date(startDate),
+        $lte: new Date(endDate)
+      };
+    }
+    
+    if (department && department !== 'all') {
+      filter.department = department;
+    }
+
+    // Fetch all required data based on report type
+    const reportData = {
+      departmentStats: [],
+      employeePerformance: [],
+      guichetierPerformance: [],
+      overallStats: {},
+      trends: {},
+      recommendations: []
+    };
+
+    // Get department statistics with extended metrics
+    if (reportType === 'all' || reportType === 'departments') {
+      reportData.departmentStats = await this.getDepartmentStats(filter);
+      
+      // Add trend analysis for departments
+      const previousPeriodFilter = {
+        ...filter,
+        createdAt: {
+          $gte: new Date(new Date(startDate).setDate(new Date(startDate).getDate() - 30)),
+          $lte: new Date(startDate)
+        }
+      };
+      const previousStats = await this.getDepartmentStats(previousPeriodFilter);
+      
+      reportData.trends.departments = reportData.departmentStats.map(dept => {
+        const previousDept = previousStats.find(p => p.department === dept.department);
+        return {
+          department: dept.department,
+          treatmentTrend: previousDept ? 
+            ((dept.treatedPercentage - previousDept.treatedPercentage) / previousDept.treatedPercentage * 100).toFixed(1) : 0,
+          volumeTrend: previousDept ? 
+            ((dept.total - previousDept.total) / previousDept.total * 100).toFixed(1) : 0
+        };
+      });
+    }
+
+    // Get employee performance with detailed metrics
+    if (reportType === 'all' || reportType === 'employees') {
+      const [employeeStats, employeeTrends] = await Promise.all([
+        this.getEmployeePerformance(filter, 50),
+        this.getEmployeePerformanceTrends(filter)
+      ]);
+
+      reportData.employeePerformance = employeeStats.map(emp => ({
+        ...emp,
+        performance: {
+          efficiency: (emp.treatedCount / (emp.totalCount || 1) * 100).toFixed(1),
+          quality: ((emp.treatedCount - emp.rejectedCount) / (emp.treatedCount || 1) * 100).toFixed(1),
+          speed: emp.avgResolutionHours.toFixed(1)
+        },
+        trend: employeeTrends.find(t => t.userId.toString() === emp.userId.toString())
+      }));
+
+      // Top performers by different metrics
+      reportData.topPerformers = {
+        efficiency: [...reportData.employeePerformance]
+          .sort((a, b) => b.performance.efficiency - a.performance.efficiency)
+          .slice(0, 5),
+        speed: [...reportData.employeePerformance]
+          .sort((a, b) => a.performance.speed - b.performance.speed)
+          .slice(0, 5),
+        quality: [...reportData.employeePerformance]
+          .sort((a, b) => b.performance.quality - a.performance.quality)
+          .slice(0, 5)
+      };
+    }
+
+    // Get guichetier performance with detailed analysis
+    if (reportType === 'all' || reportType === 'guichetiers') {
+      const guichetierStats = await this.getGuichetierPerformance(filter, 50);
+      
+      reportData.guichetierPerformance = guichetierStats.map(g => ({
+        ...g,
+        performance: {
+          submissionQuality: ((g.treatedCount - g.rejectedCount) / (g.totalCount || 1) * 100).toFixed(1),
+          volumeHandled: g.totalCount,
+          avgProcessingTime: g.avgResolutionHours.toFixed(1)
+        }
+      }));
+    }
+
+    // Calculate overall statistics
+    const statusStats = await this.getStatusDistribution(filter);
+    const totalReclamations = statusStats.reduce((sum, item) => sum + item.count, 0);
+    const treated = statusStats.find(s => s.status === 'traitée')?.count || 0;
+    const rejected = statusStats.find(s => s.status === 'rejetée')?.count || 0;
+
+    reportData.overallStats = {
+      totalReclamations,
+      treated,
+      rejected,
+      resolutionRate: totalReclamations > 0 ? (treated / totalReclamations * 100).toFixed(1) : 0,
+      avgResolutionTime: reportData.departmentStats.reduce((sum, dept) => 
+        sum + (dept.avgResolutionHours || 0), 0) / (reportData.departmentStats.length || 1),
+      periodComparison: await this.getPeriodComparison(filter, startDate, endDate)
+    };
+
+    res.json({
+      success: true,
+      data: reportData,
+      filters: {
+        startDate,
+        endDate,
+        department,
+        reportType
+      }
+    });
+  } catch (err) {
+    console.error('Error generating report:', err);
+    res.status(500).json({
+      success: false,
+      error: err.message
+    });
+  }
+};
+
+// Add this helper method for period comparison
+exports.getPeriodComparison = async (filter, startDate, endDate) => {
+  const previousPeriodFilter = {
+    ...filter,
+    createdAt: {
+      $gte: new Date(new Date(startDate).setDate(new Date(startDate).getDate() - 30)),
+      $lte: new Date(startDate)
+    }
+  };
+
+  const [currentStats, previousStats] = await Promise.all([
+    this.getStatusDistribution(filter),
+    this.getStatusDistribution(previousPeriodFilter)
+  ]);
+
+  const currentTotal = currentStats.reduce((sum, item) => sum + item.count, 0);
+  const previousTotal = previousStats.reduce((sum, item) => sum + item.count, 0);
+
+  return {
+    volumeChange: previousTotal ? ((currentTotal - previousTotal) / previousTotal * 100).toFixed(1) : 0,
+    previousPeriodTotal: previousTotal,
+    currentPeriodTotal: currentTotal
+  };
+};
+
+// Add this helper method for employee performance trends
+exports.getEmployeePerformanceTrends = async (filter) => {
+  const previousPeriodFilter = {
+    ...filter,
+    createdAt: {
+      $gte: new Date(new Date(filter.createdAt.$gte).setDate(new Date(filter.createdAt.$gte).getDate() - 30)),
+      $lte: new Date(filter.createdAt.$gte)
+    }
+  };
+
+  const previousStats = await this.getEmployeePerformance(previousPeriodFilter);
+  
+  return previousStats.map(prev => ({
+    userId: prev.userId,
+    performanceChange: {
+      volume: ((prev.totalCount - prev.previousCount) / (prev.previousCount || 1) * 100).toFixed(1),
+      efficiency: ((prev.treatedPercentage - prev.previousTreatedPercentage) / (prev.previousTreatedPercentage || 1) * 100).toFixed(1)
+    }
+  }));
+};
