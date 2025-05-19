@@ -1,9 +1,9 @@
 'use client';
-
 import { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Download, Loader2, Calendar as CalendarIcon, FileText } from "lucide-react";
+import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
+import { Download, Loader2, Calendar as CalendarIcon, FileText, ChevronLeft, ChevronRight } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -11,34 +11,15 @@ import { Textarea } from "@/components/ui/textarea";
 import { format, subDays } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { Checkbox } from "@/components/ui/checkbox";
-import { jsPDF } from 'jspdf';
-import autoTable from 'jspdf-autotable';
-import { Chart } from 'chart.js/auto';
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  PieChart,
-  Pie,
-  Cell
-} from 'recharts';
-
-// Type declarations
-declare module 'jspdf' {
-  interface jsPDF {
-    autoTable: (options: import('jspdf-autotable').UserOptions) => jsPDF;
-    lastAutoTable: {
-      finalY: number;
-    };
-  }
-}
+import { Badge } from "@/components/ui/badge";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Input } from "@/components/ui/input";
+import toast, { Toaster } from 'react-hot-toast';
+import { usePDF } from 'react-to-pdf';
 
 interface ReportData {
-  departmentStats: {
+  departmentStats?: {
     department: string;
     total: number;
     treated: number;
@@ -47,7 +28,7 @@ interface ReportData {
     treatedPercentage: number;
     avgResolutionHours: number;
   }[];
-  employeePerformance: {
+  employeePerformance?: {
     name: string;
     role: string;
     totalCount: number;
@@ -56,7 +37,7 @@ interface ReportData {
     treatedPercentage: number;
     avgResolutionHours: number;
   }[];
-  guichetierPerformance: {
+  guichetierPerformance?: {
     name: string;
     totalCount: number;
     treatedCount: number;
@@ -64,297 +45,452 @@ interface ReportData {
     treatedPercentage: number;
     avgResolutionHours: number;
   }[];
+  overallStats?: {
+    totalReclamations?: number;
+    treated?: number;
+    rejected?: number;
+    resolutionRate?: number;
+    avgResolutionTime?: number;
+  };
+  trends?: {
+    volumeChange?: number;
+    previousPeriodTotal?: number;
+  };
 }
 
-export default function ReportsPage() {
+const PRODUITS_CNI = [
+  { name: 'Madaniya', value: 'Madaniya', color: 'bg-blue-100 text-blue-800 border-blue-200' },
+  { name: 'Insaf', value: 'Insaf', color: 'bg-purple-100 text-purple-800 border-purple-200' },
+  { name: 'Rached', value: 'Rached', color: 'bg-amber-100 text-amber-800 border-amber-200' },
+];
+
+export default function ReportsDashboard() {
+  const { toPDF, targetRef } = usePDF({filename: 'rapport-reclamations.pdf'});
   const [dateRange, setDateRange] = useState({
     start: subDays(new Date(), 30),
     end: new Date()
   });
-  const [selectedDepartment, setSelectedDepartment] = useState<string>('all');
+  const [selectedProduit, setSelectedProduit] = useState<string>('all');
   const [reportType, setReportType] = useState<string>('all');
   const [includeCharts, setIncludeCharts] = useState(true);
-  const [includeRecommendations, setIncludeRecommendations] = useState(true);
+  const [includeTrends, setIncludeTrends] = useState(true);
   const [loading, setLoading] = useState(false);
   const [reportData, setReportData] = useState<ReportData | null>(null);
   const [additionalNotes, setAdditionalNotes] = useState('');
-  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
-  const [generatingInsights, setGeneratingInsights] = useState(false);
-
-  const departments = ['Madaniya', 'Insaf', 'Rached'];
+  const [activeTab, setActiveTab] = useState('summary');
 
   useEffect(() => {
     fetchReportData();
-  }, [dateRange, selectedDepartment]);
+  }, [dateRange, selectedProduit, reportType]);
 
   const fetchReportData = async () => {
     try {
       setLoading(true);
-      const params = new URLSearchParams({
-        startDate: dateRange.start.toISOString(),
-        endDate: dateRange.end.toISOString(),
-        department: selectedDepartment,
-        reportType: reportType
-      });
-
-      const response = await fetch(`http://localhost:5000/api/stats/report?${params}`);
-      if (!response.ok) throw new Error('Failed to fetch report data');
       
-      const result = await response.json();
-      setReportData(result); // Remove .data since the backend returns the data directly
+      // Mock data - replace with actual API call
+      const mockData: ReportData = {
+        departmentStats: PRODUITS_CNI.map(produit => ({
+          department: produit.name,
+          total: Math.floor(Math.random() * 100) + 50,
+          treated: Math.floor(Math.random() * 80) + 30,
+          pending: Math.floor(Math.random() * 20) + 5,
+          rejected: Math.floor(Math.random() * 10) + 2,
+          treatedPercentage: Math.floor(Math.random() * 30) + 70,
+          avgResolutionHours: Math.floor(Math.random() * 24) + 12
+        })),
+        employeePerformance: [
+          {
+            name: 'John Doe',
+            role: 'Superviseur',
+            totalCount: 45,
+            treatedCount: 40,
+            rejectedCount: 5,
+            treatedPercentage: 88.9,
+            avgResolutionHours: 18.2
+          },
+          {
+            name: 'Jane Smith',
+            role: 'Agent',
+            totalCount: 35,
+            treatedCount: 30,
+            rejectedCount: 5,
+            treatedPercentage: 85.7,
+            avgResolutionHours: 22.5
+          }
+        ],
+        guichetierPerformance: [
+          {
+            name: 'Ahmed Ben Ali',
+            totalCount: 60,
+            treatedCount: 55,
+            rejectedCount: 5,
+            treatedPercentage: 91.7,
+            avgResolutionHours: 15.8
+          },
+          {
+            name: 'Fatima Zohra',
+            totalCount: 50,
+            treatedCount: 45,
+            rejectedCount: 5,
+            treatedPercentage: 90.0,
+            avgResolutionHours: 17.2
+          }
+        ],
+        overallStats: {
+          totalReclamations: 270,
+          treated: 215,
+          rejected: 20,
+          resolutionRate: 79.6,
+          avgResolutionTime: 22.3
+        },
+        trends: {
+          volumeChange: 12.5,
+          previousPeriodTotal: 240
+        }
+      };
+
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      setReportData(mockData);
+
+      // For actual implementation:
+      // const params = new URLSearchParams({
+      //   startDate: dateRange.start.toISOString(),
+      //   endDate: dateRange.end.toISOString(),
+      //   department: selectedProduit,
+      //   reportType: reportType
+      // });
+      // const response = await fetch(`http://localhost:5000/api/stats/report?${params}`);
+      // if (!response.ok) throw new Error('Failed to fetch report data');
+      // const result = await response.json();
+      // setReportData(result.data);
+
     } catch (error) {
       console.error('Error fetching report data:', error);
+      toast.error("Impossible de charger les données du rapport");
     } finally {
       setLoading(false);
     }
   };
 
-  const generateAIInsights = async (data: ReportData) => {
-    try {
-      setGeneratingInsights(true);
-      
-      // Calculate averages
-      const avgDeptTreatment = data.departmentStats.reduce((acc, dept) => 
-        acc + dept.treatedPercentage, 0) / data.departmentStats.length;
-      
-      const avgEmpTreatment = data.employeePerformance.reduce((acc, emp) => 
-        acc + emp.treatedPercentage, 0) / data.employeePerformance.length;
-      
-      const avgGuichetierTreatment = data.guichetierPerformance.reduce((acc, g) => 
-        acc + g.treatedPercentage, 0) / data.guichetierPerformance.length;
-
-      // Find best and worst performers
-      const bestDept = data.departmentStats.reduce((a, b) => 
-        a.treatedPercentage > b.treatedPercentage ? a : b);
-      
-      const worstDept = data.departmentStats.reduce((a, b) => 
-        a.treatedPercentage < b.treatedPercentage ? a : b);
-
-      return `Analyse des performances:
-
-      1. Points forts:
-         - Le département ${bestDept.department} montre une excellente performance avec un taux de traitement de ${bestDept.treatedPercentage.toFixed(1)}%
-         - La moyenne générale de traitement des départements est de ${avgDeptTreatment.toFixed(1)}%
-         - Les guichetiers maintiennent un taux moyen de traitement de ${avgGuichetierTreatment.toFixed(1)}%
-
-      2. Points à améliorer:
-         - Le département ${worstDept.department} nécessite une attention particulière (${worstDept.treatedPercentage.toFixed(1)}%)
-         - Certains temps de traitement peuvent être optimisés
-         - Uniformiser les performances entre les départements
-
-      3. Recommandations spécifiques:
-         - Analyser les méthodes de travail du département ${bestDept.department} pour les partager
-         - Mettre en place un support supplémentaire pour ${worstDept.department}
-         - Établir des objectifs de performance progressifs
-
-      4. Actions concrètes suggérées:
-         - Organiser des sessions de formation inter-départements
-         - Mettre en place un système de mentorat
-         - Réviser les processus de traitement des réclamations
-         - Établir des réunions hebdomadaires de suivi`;
-    } catch (error) {
-      console.error('Error generating insights:', error);
-      return `Analyse des performances non disponible.`;
-    } finally {
-      setGeneratingInsights(false);
-    }
-  };
-
-  const generatePDF = async () => {
-    if (!reportData) return;
-  
-    setLoading(true);
-    try {
-      const doc = new jsPDF({
-        orientation: 'portrait',
-        unit: 'mm',
-        format: 'a4',
-      });
-  
-      // Initialize autoTable directly
-      const autoTablePlugin = (doc: jsPDF, options: import('jspdf-autotable').UserOptions) => {
-        
-      }
-  
-      // Get page dimensions
-      const pageWidth = doc.internal.pageSize.getWidth();
-      const pageHeight = doc.internal.pageSize.getHeight();
-  
-      // Cover page
-      doc.setFillColor(41, 128, 185);
-      doc.rect(0, 0, pageWidth, pageHeight, 'F');
-      
-      doc.setTextColor(255, 255, 255);
-      doc.setFontSize(28);
-      doc.text('Rapport de Performance', pageWidth / 2, 80, { align: 'center' });
-      
-      doc.setFontSize(16);
-      doc.text('Système CNI', pageWidth / 2, 100, { align: 'center' });
-      
-      doc.setFontSize(14);
-      doc.text(
-        `Période: ${format(dateRange.start, 'dd/MM/yyyy')} - ${format(dateRange.end, 'dd/MM/yyyy')}`,
-        pageWidth / 2,
-        120,
-        { align: 'center' }
-      );
-      
-      doc.setTextColor(255, 255, 255, 0.5);
-      doc.setFontSize(10);
-      doc.text(
-        `Généré le ${format(new Date(), 'dd/MM/yyyy à HH:mm')}`,
-        pageWidth / 2,
-        pageHeight - 20,
-        { align: 'center' }
-      );
-  
-      // Add new page for content
-      doc.addPage();
-  
-      // Department statistics
-      if (reportType === 'all' || reportType === 'departments') {
-        doc.setFontSize(16);
-        doc.setTextColor(41, 128, 185);
-        doc.text('Statistiques par Département', 20, 20);
-  
-        const deptData = reportData.departmentStats.map(dept => [
-          dept.department,
-          dept.total,
-          dept.treated,
-          dept.pending,
-          dept.rejected,
-          `${dept.treatedPercentage.toFixed(1)}%`,
-          `${dept.avgResolutionHours.toFixed(1)}h`
-        ]);
-  
-        autoTablePlugin(doc, {
-          startY: 30,
-          head: [['Département', 'Total', 'Traités', 'En attente', 'Rejetés', 'Taux', 'Temps moyen']],
-          body: deptData,
-          theme: 'striped',
-        });
-      }
-  
-      // Employee performance
-      if (reportType === 'all' || reportType === 'employees') {
-        doc.addPage();
-        doc.setFontSize(16);
-        doc.setTextColor(41, 128, 185);
-        doc.text('Performance des Employés', 20, 20);
-  
-        const empData = reportData.employeePerformance.map(emp => [
-          emp.name,
-          emp.role,
-          emp.totalCount,
-          emp.treatedCount,
-          emp.rejectedCount,
-          `${emp.treatedPercentage.toFixed(1)}%`,
-          `${emp.avgResolutionHours.toFixed(1)}h`
-        ]);
-  
-        autoTablePlugin(doc, {
-          startY: 30,
-          head: [['Nom', 'Rôle', 'Total', 'Traités', 'Rejetés', 'Taux', 'Temps moyen']],
-          body: empData,
-          theme: 'striped',
-        });
-      }
-  
-      // Generate insights if enabled
-      if (includeRecommendations) {
-        doc.addPage();
-        const insights = await generateAIInsights(reportData);
-        
-        doc.setFontSize(16);
-        doc.setTextColor(41, 128, 185);
-        doc.text('Recommandations', 20, 20);
-  
-        doc.setFontSize(11);
-        doc.setTextColor(0, 0, 0);
-        const splitInsights = doc.splitTextToSize(insights, 170);
-        doc.text(splitInsights, 20, 30);
-      }
-  
-      // Save and create URL
-      const pdfBlob = doc.output('blob');
-      const pdfUrl = URL.createObjectURL(pdfBlob);
-      setPdfUrl(pdfUrl);
-    } catch (error) {
-      console.error('Error generating PDF:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const [showPreview, setShowPreview] = useState(false);
-  const [charts, setCharts] = useState<any>(null);
-
-  useEffect(() => {
-    if (reportData && Object.keys(reportData).length > 0) {
-      generateCharts();
-    }
-  }, [reportData]);
-
-  const generateCharts = () => {
-    if (!reportData || !reportData.departmentStats || !reportData.employeePerformance || !reportData.guichetierPerformance) {
+  const generatePDF = () => {
+    if (!reportData) {
+      toast.error("Aucune donnée disponible pour générer le PDF");
       return;
     }
 
-    // Department Performance Chart Data
-    const departmentChartData = reportData.departmentStats.map(dept => ({
-      name: dept.department,
-      'Taux de Traitement': parseFloat(dept.treatedPercentage.toFixed(1)),
-      'Temps Moyen (h)': parseFloat(dept.avgResolutionHours.toFixed(1))
-    }));
-
-    // Employee Performance Chart Data
-    const employeeChartData = reportData.employeePerformance.map(emp => ({
-      name: emp.name,
-      'Taux de Traitement': parseFloat(emp.treatedPercentage.toFixed(1)),
-      'Temps Moyen (h)': parseFloat(emp.avgResolutionHours.toFixed(1))
-    }));
-
-    // Guichetier Performance Chart Data
-    const guichetierChartData = reportData.guichetierPerformance.map(g => ({
-      name: g.name,
-      'Taux de Traitement': parseFloat(g.treatedPercentage.toFixed(1)),
-      'Temps Moyen (h)': parseFloat(g.avgResolutionHours.toFixed(1))
-    }));
-
-    setCharts({
-      departments: departmentChartData,
-      employees: employeeChartData,
-      guichetiers: guichetierChartData
-    });
+    try {
+      toPDF();
+      toast.success("Le rapport PDF a été généré avec succès");
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      toast.error("Erreur lors de la génération du PDF");
+    }
   };
 
-  // Modify your return statement to include both preview and normal view
+  const renderProduitStats = () => {
+    if (!reportData?.departmentStats?.length) {
+      return (
+        <Card>
+          <CardHeader>
+            <CardTitle>Statistiques par Produit CNI</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-muted-foreground">Aucune donnée disponible pour les produits CNI</p>
+          </CardContent>
+        </Card>
+      );
+    }
+
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Statistiques par Produit CNI</CardTitle>
+          <CardDescription>Performance des différents produits</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-4 md:grid-cols-4">
+            {reportData.departmentStats.map((produit) => (
+              <Card key={produit.department} className="border">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-lg">{produit.department}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    <div className="flex justify-between">
+                      <span className="text-sm text-muted-foreground">Total:</span>
+                      <span className="font-medium">{produit.total}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-sm text-muted-foreground">Traités:</span>
+                      <span className="font-medium">{produit.treated}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-sm text-muted-foreground">Rejetés:</span>
+                      <span className="font-medium">{produit.rejected}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-sm text-muted-foreground">Taux:</span>
+                      <span className="font-medium">{produit.treatedPercentage?.toFixed(1)}%</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-sm text-muted-foreground">Temps moyen:</span>
+                      <span className="font-medium">{produit.avgResolutionHours?.toFixed(1)}h</span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          {includeCharts && (
+            <div className="mt-6 h-80">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={reportData.departmentStats}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="department" />
+                  <YAxis />
+                  <Tooltip />
+                  <Legend />
+                  <Bar dataKey="treated" name="Traités" fill="#4CAF50" />
+                  <Bar dataKey="rejected" name="Rejetés" fill="#F44336" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    );
+  };
+
+  const renderEmployeePerformance = () => {
+    if (!reportData?.employeePerformance?.length) {
+      return (
+        <Card>
+          <CardHeader>
+            <CardTitle>Performance des Employés</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-muted-foreground">Aucune donnée disponible pour les employés</p>
+          </CardContent>
+        </Card>
+      );
+    }
+
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Performance des Employés</CardTitle>
+          <CardDescription>Analyse des performances par employé</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Nom</TableHead>
+                <TableHead>Rôle</TableHead>
+                <TableHead className="text-right">Total</TableHead>
+                <TableHead className="text-right">Traités</TableHead>
+                <TableHead className="text-right">Taux</TableHead>
+                <TableHead className="text-right">Temps moyen</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {reportData.employeePerformance.map((emp) => (
+                <TableRow key={emp.name}>
+                  <TableCell className="font-medium">{emp.name}</TableCell>
+                  <TableCell>{emp.role}</TableCell>
+                  <TableCell className="text-right">{emp.totalCount}</TableCell>
+                  <TableCell className="text-right">{emp.treatedCount}</TableCell>
+                  <TableCell className="text-right">
+                    <Badge variant={emp.treatedPercentage > 75 ? 'default' : 'destructive'}>
+                      {emp.treatedPercentage?.toFixed(1)}%
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-right">{emp.avgResolutionHours?.toFixed(1)}h</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+    );
+  };
+
+  const renderGuichetierPerformance = () => {
+    if (!reportData?.guichetierPerformance?.length) {
+      return (
+        <Card>
+          <CardHeader>
+            <CardTitle>Performance des Guichetiers</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-muted-foreground">Aucune donnée disponible pour les guichetiers</p>
+          </CardContent>
+        </Card>
+      );
+    }
+
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Performance des Guichetiers</CardTitle>
+          <CardDescription>Analyse des performances par guichetier</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Nom</TableHead>
+                <TableHead className="text-right">Total</TableHead>
+                <TableHead className="text-right">Traités</TableHead>
+                <TableHead className="text-right">Taux</TableHead>
+                <TableHead className="text-right">Temps moyen</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {reportData.guichetierPerformance.map((guichetier) => (
+                <TableRow key={guichetier.name}>
+                  <TableCell className="font-medium">{guichetier.name}</TableCell>
+                  <TableCell className="text-right">{guichetier.totalCount}</TableCell>
+                  <TableCell className="text-right">{guichetier.treatedCount}</TableCell>
+                  <TableCell className="text-right">
+                    <Badge variant={guichetier.treatedPercentage > 80 ? 'default' : 'destructive'}>
+                      {guichetier.treatedPercentage?.toFixed(1)}%
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-right">{guichetier.avgResolutionHours?.toFixed(1)}h</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+    );
+  };
+
+  const renderSummary = () => {
+    if (!reportData?.overallStats) {
+      return (
+        <Card>
+          <CardHeader>
+            <CardTitle>Résumé Global</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-muted-foreground">Aucune donnée globale disponible</p>
+          </CardContent>
+        </Card>
+      );
+    }
+
+    const resolutionRate = reportData.overallStats.resolutionRate || 0;
+    const avgResolutionTime = reportData.overallStats.avgResolutionTime || 0;
+
+    return (
+      <div className="space-y-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Résumé Global</CardTitle>
+            <CardDescription>Statistiques globales pour la période sélectionnée</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-4 md:grid-cols-4">
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium">Total des Réclamations</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{reportData.overallStats.totalReclamations || 0}</div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium">Réclamations Traitées</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{reportData.overallStats.treated || 0}</div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium">Taux de Traitement</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{resolutionRate.toFixed(1)}%</div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium">Temps Moyen</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{avgResolutionTime.toFixed(1)}h</div>
+                </CardContent>
+              </Card>
+            </div>
+          </CardContent>
+        </Card>
+
+        {includeTrends && reportData.trends && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Tendances</CardTitle>
+              <CardDescription>Comparaison avec la période précédente</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-4 md:grid-cols-3">
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium">Évolution du Volume</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className={`text-2xl font-bold ${
+                      (reportData.trends.volumeChange || 0) > 0 ? 'text-green-600' : 'text-red-600'
+                    }`}>
+                      {(reportData.trends.volumeChange || 0).toFixed(1)}%
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      vs {reportData.trends.previousPeriodTotal || 0} réclamations
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+    );
+  };
+
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-6" ref={targetRef}>
+      <Toaster
+        position="top-center"
+        toastOptions={{
+          className: '',
+          style: {
+            border: '1px solid #713200',
+            padding: '16px',
+            color: '#713200',
+          },
+          success: {
+            style: {
+              border: '1px solid #4CAF50',
+              color: '#4CAF50',
+            },
+          },
+          error: {
+            style: {
+              border: '1px solid #F44336',
+              color: '#F44336',
+            },
+          },
+        }}
+      />
+
       <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold">Génération de Rapports</h1>
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            onClick={() => setShowPreview(!showPreview)}
-          >
-            {showPreview ? 'Masquer' : 'Aperçu'}
-          </Button>
-          <Button
-            onClick={generatePDF}
-            disabled={loading || !reportData}
-          >
-            {loading ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <Download className="mr-2 h-4 w-4" />
-            )}
-            Télécharger PDF
-          </Button>
-        </div>
+        <h1 className="text-2xl font-bold">Tableau de Bord des Rapports</h1>
       </div>
 
-      {/* Configuration Form */}
       <Card>
         <CardHeader>
           <CardTitle>Configuration du Rapport</CardTitle>
@@ -363,13 +499,13 @@ export default function ReportsPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2">
               <label className="text-sm font-medium">Période</label>
               <div className="flex gap-2">
                 <Popover>
                   <PopoverTrigger asChild>
-                    <Button variant="outline">
+                    <Button variant="outline" className="w-full justify-start text-left font-normal">
                       <CalendarIcon className="mr-2 h-4 w-4" />
                       {format(dateRange.start, 'PP', { locale: fr })}
                     </Button>
@@ -380,12 +516,14 @@ export default function ReportsPage() {
                       selected={dateRange.start}
                       onSelect={(date) => date && setDateRange({...dateRange, start: date})}
                       initialFocus
+                      locale={fr}
                     />
                   </PopoverContent>
                 </Popover>
+                <span className="flex items-center">à</span>
                 <Popover>
                   <PopoverTrigger asChild>
-                    <Button variant="outline">
+                    <Button variant="outline" className="w-full justify-start text-left font-normal">
                       <CalendarIcon className="mr-2 h-4 w-4" />
                       {format(dateRange.end, 'PP', { locale: fr })}
                     </Button>
@@ -396,6 +534,7 @@ export default function ReportsPage() {
                       selected={dateRange.end}
                       onSelect={(date) => date && setDateRange({...dateRange, end: date})}
                       initialFocus
+                      locale={fr}
                     />
                   </PopoverContent>
                 </Popover>
@@ -403,37 +542,39 @@ export default function ReportsPage() {
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium">Type de Rapport</label>
-              <Select value={reportType} onValueChange={setReportType}>
+              <label className="text-sm font-medium">Produit CNI</label>
+              <Select value={selectedProduit} onValueChange={setSelectedProduit}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Sélectionner le type" />
+                  <SelectValue placeholder="Tous les produits" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Rapport Complet</SelectItem>
-                  <SelectItem value="departments">Départements</SelectItem>
-                  <SelectItem value="employees">Employés</SelectItem>
-                  <SelectItem value="guichetiers">Guichetiers</SelectItem>
+                  <SelectItem value="all">Tous les produits</SelectItem>
+                  {PRODUITS_CNI.map((produit) => (
+                    <SelectItem key={produit.value} value={produit.value}>
+                      {produit.name}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium">Département</label>
-              <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
+              <label className="text-sm font-medium">Type de Rapport</label>
+              <Select value={reportType} onValueChange={setReportType}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Sélectionner le département" />
+                  <SelectValue placeholder="Rapport Complet" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Tous les départements</SelectItem>
-                  {departments.map(dept => (
-                    <SelectItem key={dept} value={dept}>{dept}</SelectItem>
-                  ))}
+                  <SelectItem value="all">Rapport Complet</SelectItem>
+                  <SelectItem value="departments">Produits CNI</SelectItem>
+                  <SelectItem value="employees">Employés</SelectItem>
+                  <SelectItem value="guichetiers">Guichetiers</SelectItem>
                 </SelectContent>
               </Select>
             </div>
           </div>
 
-          <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="flex items-center space-x-2">
               <Checkbox
                 id="charts"
@@ -447,12 +588,12 @@ export default function ReportsPage() {
 
             <div className="flex items-center space-x-2">
               <Checkbox
-                id="recommendations"
-                checked={includeRecommendations}
-                onCheckedChange={(checked) => setIncludeRecommendations(checked as boolean)}
+                id="trends"
+                checked={includeTrends}
+                onCheckedChange={(checked) => setIncludeTrends(checked as boolean)}
               />
-              <label htmlFor="recommendations" className="text-sm font-medium">
-                Inclure les recommandations (IA)
+              <label htmlFor="trends" className="text-sm font-medium">
+                Inclure les tendances
               </label>
             </div>
           </div>
@@ -463,27 +604,16 @@ export default function ReportsPage() {
               placeholder="Ajoutez des notes ou commentaires spécifiques..."
               value={additionalNotes}
               onChange={(e) => setAdditionalNotes(e.target.value)}
-              rows={4}
+              rows={3}
             />
           </div>
 
-          <div className="flex justify-end gap-4">
-            {pdfUrl && (
-              <Button variant="outline" asChild>
-                <a href={pdfUrl} target="_blank" rel="noopener noreferrer">
-                  <FileText className="mr-2 h-4 w-4" />
-                  Prévisualiser
-                </a>
-              </Button>
-            )}
-            <Button
-              onClick={generatePDF}
-              disabled={loading || !reportData || generatingInsights}
-            >
-              {loading || generatingInsights ? (
+          <div className="flex justify-end">
+            <Button onClick={generatePDF} disabled={loading || !reportData}>
+              {loading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  {generatingInsights ? 'Analyse IA...' : 'Génération...'}
+                  Génération...
                 </>
               ) : (
                 <>
@@ -496,19 +626,39 @@ export default function ReportsPage() {
         </CardContent>
       </Card>
 
-      {pdfUrl && (
+      {loading ? (
+        <div className="flex justify-center items-center h-64">
+          <Loader2 className="h-8 w-8 animate-spin" />
+        </div>
+      ) : reportData ? (
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList className="grid w-full grid-cols-4">
+            <TabsTrigger value="summary">Résumé</TabsTrigger>
+            <TabsTrigger value="produits" disabled={reportType === 'employees' || reportType === 'guichetiers'}>
+              Produits CNI
+            </TabsTrigger>
+            <TabsTrigger value="employees" disabled={reportType === 'departments' || reportType === 'guichetiers'}>
+              Employés
+            </TabsTrigger>
+            <TabsTrigger value="guichetiers" disabled={reportType === 'departments' || reportType === 'employees'}>
+              Guichetiers
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="summary">{renderSummary()}</TabsContent>
+          <TabsContent value="produits">{renderProduitStats()}</TabsContent>
+          <TabsContent value="employees">{renderEmployeePerformance()}</TabsContent>
+          <TabsContent value="guichetiers">{renderGuichetierPerformance()}</TabsContent>
+        </Tabs>
+      ) : (
         <Card>
           <CardHeader>
-            <CardTitle>Aperçu du Rapport</CardTitle>
+            <CardTitle>Aucune donnée disponible</CardTitle>
           </CardHeader>
-          <CardContent className="h-[600px]">
-            <iframe 
-              src={pdfUrl} 
-              width="100%" 
-              height="100%"
-              className="border rounded-lg"
-              title="Aperçu du rapport"
-            />
+          <CardContent>
+            <p className="text-muted-foreground">
+              Aucune donnée n'a pu être chargée. Veuillez vérifier vos paramètres ou réessayer.
+            </p>
           </CardContent>
         </Card>
       )}

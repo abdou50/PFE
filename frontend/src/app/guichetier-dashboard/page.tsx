@@ -6,9 +6,9 @@ import ReclamationTable from "../components/ReclamationTable ";
 export default function GuichetierDashboard() {
   const [reclamations, setReclamations] = useState([]);
   const [department, setDepartment] = useState<string>("");
-
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc"); // Add this
 
   useEffect(() => {
     // Fetch the guichetier's department from localStorage
@@ -19,10 +19,21 @@ export default function GuichetierDashboard() {
     if (storedDepartment) {
       axios
         .get(`http://localhost:5000/api/reclamations/department/${storedDepartment}`)
-        .then((response) => setReclamations(response.data.data))
-        .catch((error) => console.error("Error fetching reclamations:", error));
+        .then((response) => {
+          setReclamations(response.data.data);
+          setIsLoading(false);
+        })
+        .catch((error) => {
+          console.error("Error fetching reclamations:", error);
+          setError("Failed to fetch reclamations");
+          setIsLoading(false);
+        });
     }
   }, []);
+
+  const handleSortChange = (newOrder: "asc" | "desc") => {
+    setSortOrder(newOrder);
+  };
 
   if (error) {
     return (
@@ -43,7 +54,11 @@ export default function GuichetierDashboard() {
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
         </div>
       ) : (
-        <ReclamationTable data={reclamations} />
+        <ReclamationTable 
+          data={reclamations} 
+          sortOrder={sortOrder}
+          onSortChange={handleSortChange}
+        />
       )}
     </div>
   );
