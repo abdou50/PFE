@@ -134,6 +134,13 @@ exports.updateReclamation = async (req, res) => {
     if (guichetierId) existingReclamation.guichetierId = guichetierId;
     if (employeeId) existingReclamation.employeeId = employeeId;
     if (feedback) existingReclamation.feedback = feedback;
+    
+    // Update additional fields if provided
+    if (req.body.firstName) existingReclamation.firstName = req.body.firstName;
+    if (req.body.department) existingReclamation.department = req.body.department;
+    if (req.body.type) existingReclamation.type = req.body.type;
+    if (req.body.ministre) existingReclamation.ministre = req.body.ministre;
+    if (req.body.service) existingReclamation.service = req.body.service;
 
     // Check if status change requires email
     const isStatusChangeRequiringEmail = 

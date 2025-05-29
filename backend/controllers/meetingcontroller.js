@@ -1,6 +1,7 @@
 const Meeting = require("../models/Meeting");
 const User = require("../models/User");
 const mongoose = require("mongoose");
+const nodemailer = require('nodemailer');
 
 exports.createMeeting = async (req, res) => {
   try {
@@ -325,8 +326,106 @@ exports.generateAndSaveMeetingLink = async (req, res) => {
       return res.status(404).json({ error: "Meeting not found" });
     }
 
-    // In production: Send email to user with the meeting link
-    // await sendMeetingLinkEmail(updatedMeeting.userId.email, meetingLink);
+    // Send email to user with the meeting link
+    if (updatedMeeting.userId && updatedMeeting.userId.email) {
+      try {
+        const transporter = nodemailer.createTransport({
+          service: 'gmail',
+          host: process.env.SMTP_HOST,
+          port: parseInt(process.env.SMTP_PORT),
+          auth: {
+            user: process.env.SMTP_USER,
+            pass: process.env.SMTP_PASS
+          }
+        });
+
+        const meetingDate = new Date(updatedMeeting.date);
+        const formattedDate = meetingDate.toLocaleDateString('fr-FR', {
+          weekday: 'long',
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric'
+        });
+        
+        const formattedTime = meetingDate.toLocaleTimeString('fr-FR', {
+          hour: '2-digit',
+          minute: '2-digit'
+        });
+
+        // Get user name with fallbacks
+        const userFirstName = updatedMeeting.userId?.firstName || "Client";
+        const userLastName = updatedMeeting.userId?.lastName || "";
+        
+        // Get employee info with fallbacks
+        const employeeInfo = updatedMeeting.employeeId ? 
+          `${updatedMeeting.employeeId.firstName || ""} ${updatedMeeting.employeeId.lastName || ""}`.trim() : 
+          'À déterminer';
+
+        const emailTemplate = `
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <style>
+              body { font-family: Arial, sans-serif; line-height: 1.6; }
+              .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+              .header { background-color: #f8f9fa; padding: 20px; text-align: center; }
+              .content { padding: 20px; }
+              .button {
+                display: inline-block;
+                padding: 10px 20px;
+                background-color: #4CAF50;
+                color: white;
+                text-decoration: none;
+                border-radius: 4px;
+                margin-top: 20px;
+              }
+              .info { margin: 20px 0; padding: 15px; background-color: #f1f1f1; border-radius: 4px; }
+            </style>
+          </head>
+          <body>
+            <div class="container">
+              <div class="header">
+                <h2>CNI - Lien de votre rendez-vous virtuel</h2>
+              </div>
+              <div class="content">
+                <p>Bonjour ${userFirstName} ${userLastName},</p>
+                <p>Votre rendez-vous virtuel a été planifié avec succès.</p>
+                
+                <div class="info">
+                  <p><strong>Date:</strong> ${formattedDate}</p>
+                  <p><strong>Heure:</strong> ${formattedTime}</p>
+                  <p><strong>Département:</strong> ${updatedMeeting.department || ""}</p>
+                  <p><strong>Avec:</strong> ${employeeInfo}</p>
+                </div>
+                
+                <p>Vous pouvez rejoindre la réunion en cliquant sur le lien ci-dessous (disponible 10 minutes avant l'heure prévue):</p>
+                <a href="${meetingLink}" class="button">Rejoindre la réunion</a>
+                
+                <p>Si vous ne pouvez pas cliquer sur le bouton, copiez et collez ce lien dans votre navigateur:</p>
+                <p>${meetingLink}</p>
+                
+                <p>Cordialement,<br>L'équipe CNI</p>
+              </div>
+            </div>
+          </body>
+          </html>
+        `;
+
+        await transporter.sendMail({
+          from: {
+            name: 'CNI Service de Rendez-vous',
+            address: process.env.SMTP_USER
+          },
+          to: updatedMeeting.userId.email,
+          subject: `[CNI] Lien pour votre rendez-vous du ${formattedDate}`,
+          html: emailTemplate
+        });
+
+        console.log('Meeting link email sent successfully to:', updatedMeeting.userId.email);
+      } catch (emailError) {
+        console.error('Email sending failed:', emailError.message);
+      }
+    }
 
     res.status(200).json({
       message: "Meeting link generated and saved successfully",
