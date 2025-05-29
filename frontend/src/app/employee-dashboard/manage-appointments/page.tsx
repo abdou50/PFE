@@ -98,9 +98,10 @@ export default function EmployeeMeetingDashboard() {
     const now = new Date();
     const meetingTime = new Date(meetingDate);
     const fifteenMinutesBefore = addMinutes(meetingTime, -15);
-    const thirtyMinutesAfter = addMinutes(meetingTime, 30);
+    const fifteenMinutesAfter = addMinutes(meetingTime, 15);
     
-    return isAfter(now, fifteenMinutesBefore) && isBefore(now, thirtyMinutesAfter);
+    // Can join 15 minutes before and 15 minutes after scheduled time
+    return isAfter(now, fifteenMinutesBefore) && isBefore(now, fifteenMinutesAfter);
   };
 
   const generateMeetingLink = async (meetingId: string) => {
@@ -128,7 +129,34 @@ export default function EmployeeMeetingDashboard() {
       toast.error("Aucun lien de réunion disponible");
       return;
     }
+    
+    const now = new Date();
+    const meetingTime = new Date(meeting.date);
+    const fifteenMinutesBefore = addMinutes(meetingTime, -15);
+    const fifteenMinutesAfter = addMinutes(meetingTime, 15);
+    
+    if (!canJoinMeeting(meeting.date)) {
+      const formattedDate = format(parseISO(meeting.date), "PPPp", { locale: fr });
+      
+      if (isBefore(now, fifteenMinutesBefore)) {
+        // Too early to join
+        const minutesUntilJoinable = Math.ceil(differenceInMinutes(fifteenMinutesBefore, now));
+        toast.error(
+          `Vous pourrez rejoindre cette réunion dans ${minutesUntilJoinable} minutes (à partir de ${format(fifteenMinutesBefore, "HH:mm", { locale: fr })})`,
+          { duration: 5000 }
+        );
+      } else if (isAfter(now, fifteenMinutesAfter)) {
+        // Too late to join
+        toast.error(
+          `Le délai pour rejoindre cette réunion est dépassé (disponible jusqu'à ${format(fifteenMinutesAfter, "HH:mm", { locale: fr })})`,
+          { duration: 5000 }
+        );
+      }
+      return;
+    }
+    
     window.open(meeting.meetingLink, '_blank');
+    toast.success("Redirection vers la réunion en cours...");
   };
 
   const updateMeetingStatus = async (status: "Terminé" | "Annulé") => {
@@ -148,29 +176,6 @@ export default function EmployeeMeetingDashboard() {
       setIsDetailsOpen(false);
     } catch (err) {
       toast.error("Erreur lors de la mise à jour du statut");
-    }
-  };
-
-  const updateMeetingLink = async () => {
-    if (!selectedMeeting || !meetingLink) {
-      toast.error("Veuillez entrer un lien de réunion valide");
-      return;
-    }
-
-    try {
-      await axios.put(
-        `http://localhost:5000/api/meetings/${selectedMeeting._id}/link`,
-        { meetingLink }
-      );
-      
-      setMeetings(meetings.map(m => 
-        m._id === selectedMeeting._id ? { ...m, meetingLink } : m
-      ));
-      
-      toast.success("Lien de réunion mis à jour");
-      setIsDetailsOpen(false);
-    } catch (err) {
-      toast.error("Erreur lors de la mise à jour du lien");
     }
   };
 
@@ -358,21 +363,23 @@ export default function EmployeeMeetingDashboard() {
                         <TableCell className="flex justify-end space-x-2">
                           {meeting.status === "Planifié" && (
                             <>
-                              {meeting.meetingLink && canJoinMeeting(meeting.date) ? (
+                              {meeting.meetingLink ? (
                                 <Button
                                   size="sm"
                                   onClick={() => joinMeeting(meeting)}
+                                  disabled={!canJoinMeeting(meeting.date)}
+                                  className={!canJoinMeeting(meeting.date) ? "opacity-50" : ""}
                                 >
                                   <Video className="h-4 w-4 mr-1" /> Rejoindre
                                 </Button>
-                              ) : !meeting.meetingLink ? (
+                              ) : (
                                 <Button
                                   size="sm"
                                   onClick={() => generateMeetingLink(meeting._id)}
                                 >
                                   <Video className="h-4 w-4 mr-1" /> Créer lien
                                 </Button>
-                              ) : null}
+                              )}
                             </>
                           )}
                           <Button
@@ -503,8 +510,7 @@ export default function EmployeeMeetingDashboard() {
                         <div className="flex gap-2">
                           <Input
                             value={meetingLink}
-                            onChange={(e) => setMeetingLink(e.target.value)}
-                            placeholder="https://meet.pelsi.example.com/..."
+                            readOnly
                             className="flex-1"
                           />
                           <Button
@@ -517,15 +523,32 @@ export default function EmployeeMeetingDashboard() {
                             Copier
                           </Button>
                         </div>
-                        {canJoinMeeting(selectedMeeting.date) && (
-                          <Button 
-                            variant="outline" 
-                            className="w-full"
-                            onClick={() => joinMeeting(selectedMeeting)}
-                          >
-                            <Video className="h-4 w-4 mr-2" />
-                            Rejoindre la réunion
-                          </Button>
+                        <Button 
+                          variant="outline" 
+                          className="w-full"
+                          onClick={() => joinMeeting(selectedMeeting)}
+                          disabled={!canJoinMeeting(selectedMeeting.date)}
+                        >
+                          <Video className="h-4 w-4 mr-2" />
+                          Rejoindre la réunion
+                        </Button>
+                        {!canJoinMeeting(selectedMeeting.date) && (
+                          <div className="text-sm text-muted-foreground mt-2">
+                            {(() => {
+                              const now = new Date();
+                              const meetingTime = new Date(selectedMeeting.date);
+                              const fifteenMinutesBefore = addMinutes(meetingTime, -15);
+                              const fifteenMinutesAfter = addMinutes(meetingTime, 15);
+                              
+                              if (isBefore(now, fifteenMinutesBefore)) {
+                                const minutesUntilJoinable = Math.ceil(differenceInMinutes(fifteenMinutesBefore, now));
+                                return `Vous pourrez rejoindre cette réunion dans ${minutesUntilJoinable} minutes (à partir de ${format(fifteenMinutesBefore, "HH:mm", { locale: fr })})`;
+                              } else if (isAfter(now, fifteenMinutesAfter)) {
+                                return `Le délai pour rejoindre cette réunion est dépassé (disponible jusqu'à ${format(fifteenMinutesAfter, "HH:mm", { locale: fr })})`;
+                              }
+                              return "";
+                            })()}
+                          </div>
                         )}
                       </>
                     ) : (
@@ -567,15 +590,10 @@ export default function EmployeeMeetingDashboard() {
               )}
             </div>
           )}
-          <DialogFooter className="gap-2">
+          <DialogFooter>
             <Button variant="outline" onClick={() => setIsDetailsOpen(false)}>
               Fermer
             </Button>
-            {selectedMeeting?.status === "Planifié" && selectedMeeting?.meetingLink && (
-              <Button onClick={updateMeetingLink}>
-                Mettre à jour le lien
-              </Button>
-            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

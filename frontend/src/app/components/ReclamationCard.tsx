@@ -210,10 +210,12 @@ export function ReclamationCard({
     formData.append("description", editedDescription);
 
     if (editedFiles) {
-      editedFiles.forEach((file) => formData.append("files", file));
+      Array.from(editedFiles).forEach((file) => formData.append("files", file));
     }
 
-    formData.append("filesToDelete", JSON.stringify(filesToDelete));
+    if (filesToDelete.length > 0) {
+      formData.append("filesToDelete", JSON.stringify(filesToDelete));
+    }
 
     const loadingToastId = toast.loading("Enregistrement en cours...");
 
@@ -223,7 +225,10 @@ export function ReclamationCard({
       });
 
       if (response.status === 200) {
-        const updatedFiles = response.data.data.files || [];
+        // Make sure we're using the correct data structure from the response
+        const updatedData = response.data.data || response.data;
+        const updatedFiles = updatedData.files || [];
+        
         onEdit(id, {
           title: editedTitle,
           description: editedDescription,

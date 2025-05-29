@@ -52,15 +52,27 @@ export default function PageBrouillons() {
   const handleEdit = async (id: string, updatedData: any) => {
     try {
       const formData = new FormData();
-      formData.append("title", updatedData.title);
-      formData.append("description", updatedData.description);
+      
+      // Only append fields that are actually provided
+      if (updatedData.title) formData.append("title", updatedData.title);
+      if (updatedData.description) formData.append("description", updatedData.description);
       
       if (updatedData.filesToDelete) {
         formData.append("filesToDelete", JSON.stringify(updatedData.filesToDelete));
       }
   
+      if (updatedData.files && Array.isArray(updatedData.files)) {
+        // If files is an array of strings (existing files), don't append them
+        // The backend already has them
+      }
+      
       if (updatedData.newFiles) {
         updatedData.newFiles.forEach((file: File) => formData.append("files", file));
+      }
+
+      // If status is being updated, append it
+      if (updatedData.status) {
+        formData.append("status", updatedData.status);
       }
 
       await axios.put(
@@ -70,7 +82,7 @@ export default function PageBrouillons() {
       );
       
       toast.success("Réclamation mise à jour");
-      fetchReclamations(); // Rafraîchit la liste
+      fetchReclamations(); // Refresh the list
     } catch (error) {
       console.error("Erreur de mise à jour:", error);
       toast.error("Échec de la mise à jour");

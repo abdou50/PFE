@@ -279,19 +279,7 @@ export function Sidebar() {
                   {!isCollapsed && "Rapports"}
                 </Button>
               </Link>
-              <Link href="/director-dashboard/stats">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className={cn(
-                    "w-full justify-start rounded-lg border border-transparent hover:border-primary/50 transition-all duration-200",
-                    isActive("/director-dashboard/stats") && "border-primary/50 shadow-sm"
-                  )}
-                >
-                  <PieChart className="mr-2 h-4 w-4" />
-                  {!isCollapsed && "Statistiques"}
-                </Button>
-              </Link>
+              {/* Removed the statistics link */}
             </>
           )}
         </div>
