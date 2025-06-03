@@ -157,7 +157,7 @@ export function ReclamationCard({
             <svg class="w-5 h-5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
             </svg>
-            <span>Cette réclamation sera envoyée au ministère</span>
+            <span>Cette réclamation sera envoyée au  Guichetier de votre produit cni</span>
           </div>
           <p>Confirmez-vous l'envoi définitif ?</p>
         </div>
@@ -225,7 +225,6 @@ export function ReclamationCard({
       });
 
       if (response.status === 200) {
-        // Make sure we're using the correct data structure from the response
         const updatedData = response.data.data || response.data;
         const updatedFiles = updatedData.files || [];
         

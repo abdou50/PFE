@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { ReclamationCard } from "../../components/ReclamationCard";
 import axios from "axios";
-import { toast } from "sonner"; // J'utilise sonner pour des toasts plus modernes
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 
 interface Reclamation {
@@ -32,7 +32,7 @@ export default function PageBrouillons() {
       const response = await axios.get(`http://localhost:5000/api/reclamations/user/${userId}`);
       const formattedData = response.data.data.map((rec: any) => ({
         ...rec,
-        status: rec.status === "pending" ? "brouillant" : rec.status, // Adaptation du statut
+        status: rec.status === "pending" ? "brouillant" : rec.status, 
         files: rec.files || [],
       }));
       setReclamations(formattedData);
@@ -53,7 +53,6 @@ export default function PageBrouillons() {
     try {
       const formData = new FormData();
       
-      // Only append fields that are actually provided
       if (updatedData.title) formData.append("title", updatedData.title);
       if (updatedData.description) formData.append("description", updatedData.description);
       
@@ -62,15 +61,13 @@ export default function PageBrouillons() {
       }
   
       if (updatedData.files && Array.isArray(updatedData.files)) {
-        // If files is an array of strings (existing files), don't append them
-        // The backend already has them
+
       }
       
       if (updatedData.newFiles) {
         updatedData.newFiles.forEach((file: File) => formData.append("files", file));
       }
 
-      // If status is being updated, append it
       if (updatedData.status) {
         formData.append("status", updatedData.status);
       }
@@ -103,7 +100,6 @@ export default function PageBrouillons() {
   if (loading) return <div className="text-center py-8">Chargement...</div>;
   if (error) return <div className="text-red-500 text-center py-8">{error}</div>;
 
-  // Filtre pour n'afficher que les brouillons
   const brouillons = reclamations.filter(
     reclamation => reclamation.status === "brouillant"
   );

@@ -121,7 +121,6 @@ export default function EmployeeReclamationTable() {
     fetchEmployeeData();
   }, []);
 
-  // Filter data to only show reclamations assigned to this employee
   const employeeReclamations = useMemo(() => {
     return reclamations.filter(reclamation => reclamation.employeeId === employeeId);
   }, [reclamations, employeeId]);
@@ -198,7 +197,6 @@ export default function EmployeeReclamationTable() {
         toast.success(`Réclamation marquée comme ${newStatus}`);
         setIsDialogOpen(false);
         setIsPriseEnChargeOpen(false);
-        // Refresh the data
         const updatedResponse = await axios.get(`http://localhost:5000/api/reclamations/employee/${employeeId}`);
         setReclamations(updatedResponse.data.data);
       }

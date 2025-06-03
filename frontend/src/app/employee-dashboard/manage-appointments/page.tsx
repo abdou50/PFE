@@ -67,12 +67,6 @@ export default function EmployeeMeetingDashboard() {
     const fetchData = async () => {
       const dept = localStorage.getItem("department");
       setDepartment(dept);
-      
-      if (!dept || !employeeId) {
-        toast.error("Informations de l'employé non trouvées");
-        setIsLoading(false);
-        return;
-      }
   
       setIsLoading(true);
       try {
@@ -100,7 +94,6 @@ export default function EmployeeMeetingDashboard() {
     const fifteenMinutesBefore = addMinutes(meetingTime, -15);
     const fifteenMinutesAfter = addMinutes(meetingTime, 15);
     
-    // Can join 15 minutes before and 15 minutes after scheduled time
     return isAfter(now, fifteenMinutesBefore) && isBefore(now, fifteenMinutesAfter);
   };
 
@@ -139,14 +132,12 @@ export default function EmployeeMeetingDashboard() {
       const formattedDate = format(parseISO(meeting.date), "PPPp", { locale: fr });
       
       if (isBefore(now, fifteenMinutesBefore)) {
-        // Too early to join
         const minutesUntilJoinable = Math.ceil(differenceInMinutes(fifteenMinutesBefore, now));
         toast.error(
           `Vous pourrez rejoindre cette réunion dans ${minutesUntilJoinable} minutes (à partir de ${format(fifteenMinutesBefore, "HH:mm", { locale: fr })})`,
           { duration: 5000 }
         );
       } else if (isAfter(now, fifteenMinutesAfter)) {
-        // Too late to join
         toast.error(
           `Le délai pour rejoindre cette réunion est dépassé (disponible jusqu'à ${format(fifteenMinutesAfter, "HH:mm", { locale: fr })})`,
           { duration: 5000 }

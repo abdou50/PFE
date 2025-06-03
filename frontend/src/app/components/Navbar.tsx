@@ -9,11 +9,10 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
-import { LogOut, Menu } from "lucide-react"; // Changed Search to Menu
+import { LogOut } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState, useEffect } from "react"; // Added useEffect
+import { useState, useEffect } from "react";
 
-// Add this function before the Navbar component
 const translateRole = (role: string): string => {
   switch (role) {
     case "employee": return "Technicien";
@@ -30,7 +29,6 @@ export function Navbar() {
   const [userName, setUserName] = useState("");
   const [userRole, setUserRole] = useState("");
   const [userDepartment, setUserDepartment] = useState("");
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
   useEffect(() => {
     setUserName(localStorage.getItem("firstName") || "");
@@ -51,20 +49,8 @@ export function Navbar() {
 
   return (
     <div className="flex items-center justify-between p-4 border-b">
-      {/* Left side: Only sidebar toggle */}
-      <button
-        onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-        className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors"
-      >
-        {isSidebarCollapsed ? (
-          <Menu className="h-5 w-5 transform rotate-180" /> // Arrow pointing right
-        ) : (
-          <Menu className="h-5 w-5" /> // Arrow pointing left
-        )}
-      </button>
-
       {/* Right side: Theme toggle, user info, and avatar */}
-      <div className="flex items-center space-x-4">
+      <div className="flex items-center space-x-4 ml-auto">
         <ThemeToggle />
         <div className="flex items-center space-x-3">
           <div className="flex flex-col items-end">

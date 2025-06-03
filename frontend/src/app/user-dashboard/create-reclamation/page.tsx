@@ -50,7 +50,6 @@ export default function CreateReclamationPage() {
   const [actionType, setActionType] = useState<"envoyer" | "brouillant">("envoyer");
   const [objectOptions, setObjectOptions] = useState<string[]>([]);
 
-  // Load initial data from localStorage
   useEffect(() => {
     if (typeof window !== "undefined") {
       const storedService = localStorage.getItem("service");
@@ -66,22 +65,19 @@ export default function CreateReclamationPage() {
       setMinistre(localStorage.getItem("ministre") || "");
       setService(storedService || "");
 
-      // Set initial object options based on department
       if (storedDepartment && departmentOptions[storedDepartment as keyof typeof departmentOptions]) {
         setObjectOptions(departmentOptions[storedDepartment as keyof typeof departmentOptions]);
       }
     }
   }, []);
 
-  // Update object options when department changes
   useEffect(() => {
     if (department && departmentOptions[department as keyof typeof departmentOptions]) {
       setObjectOptions(departmentOptions[department as keyof typeof departmentOptions]);
-      setTitle({ text: "", type: "" }); // Reset title when department changes
+      setTitle({ text: "", type: "" }); 
     }
   }, [department]);
 
-  // Handle file upload
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       const files = Array.from(e.target.files).filter(file => 
@@ -95,7 +91,6 @@ export default function CreateReclamationPage() {
     }
   };
 
-  // Typing effect for AI-generated description
   const typeText = (text: string, setter: React.Dispatch<React.SetStateAction<string>>) => {
     let index = 0;
     const interval = setInterval(() => {
@@ -157,7 +152,6 @@ export default function CreateReclamationPage() {
     }
   };
 
-  // Handle form submission (send to database)
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -214,7 +208,6 @@ export default function CreateReclamationPage() {
     }
   };
 
-  // Handle saving locally
   const handleSaveLocally = async () => {
     if (!title.text || !description) {
       toast.error("Veuillez remplir tous les champs obligatoires.");
@@ -255,7 +248,6 @@ export default function CreateReclamationPage() {
     }
   };
 
-  // Handle cancel
   const handleCancel = () => {
     setTitle({ text: "", type: "" });
     setDescription("");
@@ -263,7 +255,6 @@ export default function CreateReclamationPage() {
     toast.success("Formulaire annulé.");
   };
 
-  // Handle PDF download confirmation
   const handleDownloadPDF = async () => {
     const pdfBlob = await pdf(
       <ReclamationPDF

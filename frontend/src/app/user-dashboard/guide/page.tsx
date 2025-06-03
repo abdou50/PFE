@@ -24,7 +24,7 @@ export default function UserDashboard() {
     <div className="p-4">
        <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold">
-          Bonjour {firstName || "Utilisateur"}, vous êtes dans le département {department || "N/A"}.
+          Bonjour {firstName || "Utilisateur"}, vous êtes dans le Poduit cni  {department || "N/A"}.
         </h1>
         <Image src="/assets/cni1.png" alt="CNI Logo" width={100} height={100} className="mb-4" style={{ background: "transparent" }} />
       </div>
@@ -59,7 +59,6 @@ export default function UserDashboard() {
           <li>Consultez régulièrement l'onglet "Suivi des demandes" pour voir l'état de votre réclamation.</li>
           <li>Les statuts possibles sont :
           <ul className="ml-4">
-              <li className="text-orange-500">🟠 En attente - Votre demande a été reçue et sera examinée prochainement.</li>
               <li className="text-yellow-500">🟡 En cours de traitement - Votre réclamation est actuellement en cours d'analyse.</li>
               <li className="text-green-500">🟢 Résolue - Votre réclamation a été traitée avec succès.</li>
               <li className="text-red-500">🔴 Rejetée - Votre réclamation n'a pas été acceptée, consultez les détails pour plus d'informations.</li>

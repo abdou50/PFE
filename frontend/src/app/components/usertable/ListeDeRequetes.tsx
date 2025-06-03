@@ -67,7 +67,6 @@ export default function ListeDeRequetes() {
   const [selectedReclamation, setSelectedReclamation] = useState<Reclamation | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [seenReclamations, setSeenReclamations] = useState<Set<string>>(() => {
-    // Initialize from localStorage
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('seenReclamations');
       return new Set(saved ? JSON.parse(saved) : []);
