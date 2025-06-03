@@ -5,10 +5,9 @@ const reclamationController = require("../controllers/reclamationController");
 
 const router = express.Router();
 
-// Configure Multer for file uploads
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, "uploads/reclamations/"); // Save files to "uploads/reclamations" folder
+    cb(null, "uploads/reclamations/"); 
   },
   filename: (req, file, cb) => {
     const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
@@ -28,17 +27,11 @@ const upload = multer({
 });
 router.use("/uploads/reclamations", express.static(path.join(__dirname, "../uploads/reclamations")));
 router.post("/", upload.array("files", 10), reclamationController.createReclamation);
-
 router.put("/:id", upload.array("files", 10), reclamationController.updateReclamation);
-
 router.get("/user/:userId", reclamationController.getReclamationsByUserId);
-
 router.get("/department/:department", reclamationController.getReclamationsByDepartment);
-
 router.put("/:id/status", reclamationController.updateStatus);
-
 router.get("/user/:userId/filter", reclamationController.getFilteredReclamations);
-
 router.get("/:id", reclamationController.getReclamationById);
 router.delete('/:id', reclamationController.deleteReclamation);
 router.get('/employee/:employeeId', reclamationController.getReclamationsByEmployeeId);

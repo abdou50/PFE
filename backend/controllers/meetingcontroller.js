@@ -16,18 +16,17 @@ exports.createMeeting = async (req, res) => {
       return res.status(400).json({ error: "Invalid date format" });
     }
 
-    // Add validation for past dates
     const now = new Date();
     if (parsedDate < now) {
-      return res.status(400).json({ error: "Cannot schedule meetings in the past" });
+      return res.status(400).json({ error: "Impossible de planifier un Rdv dans le passé" });
     }
 
     // Add validation for business hours and weekends
     if (parsedDate.getDay() === 0 || parsedDate.getDay() === 6) {
-      return res.status(400).json({ error: "Cannot schedule meetings on weekends" });
+      return res.status(400).json({ error: "Vous ne pouvez pas planifier des RDV dans les weekends" });
     }
     if (parsedDate.getHours() < 8 || parsedDate.getHours() >= 17) {
-      return res.status(400).json({ error: "Outside business hours (8h-17h)" });
+      return res.status(400).json({ error: " Hors horraire de travail (8h-17h)" });
     }
 
     const validDepartments = ["Madaniya", "Insaf", "Rached"];
@@ -35,7 +34,6 @@ exports.createMeeting = async (req, res) => {
       return res.status(400).json({ error: "Invalid department" });
     }
 
-    // Check for overlapping meetings
     const overlappingMeeting = await Meeting.findOne({
       date: { $gte: new Date(parsedDate.getTime() - 30 * 60 * 1000), $lt: new Date(parsedDate.getTime() + 30 * 60 * 1000) },
       status: { $in: ["Demandé", "Planifié"] }
@@ -96,7 +94,6 @@ exports.getDepartmentMeetings = async (req, res) => {
   }
 };
 
-// Add this to your meetingcontroller.js
 exports.checkMeetingConflict = async (req, res) => {
   try {
     const { employeeId, date, meetingId } = req.query;
@@ -130,7 +127,6 @@ exports.checkMeetingConflict = async (req, res) => {
   }
 };
 
-// Enhanced rescheduleMeeting
 exports.rescheduleMeeting = async (req, res) => {
   try {
     const { meetingId } = req.params;
@@ -215,6 +211,7 @@ exports.getMeetingsByUserId = async (req, res) => {
     res.status(500).json({ error: "Server error" });
   }
 };
+
 exports.getEmployeeAvailability = async (req, res) => {
   try {
     const { employeeId, date } = req.query;
@@ -298,8 +295,7 @@ exports.getAllEmployees = async (req, res) => {
     res.status(500).json({ error: "Server error" });
   }
 };
-// Generate meeting link
-// Generate and save meeting link
+
 exports.generateAndSaveMeetingLink = async (req, res) => {
   try {
     const { meetingId } = req.params;
@@ -308,14 +304,13 @@ exports.generateAndSaveMeetingLink = async (req, res) => {
       return res.status(400).json({ error: "Invalid meeting ID" });
     }
 
-    // Generate a secure Jitsi Meet link with meeting ID
     const meetingLink = `https://meet.jit.si/CNI-${meetingId}-${Math.random().toString(36).substring(2, 8)}`;
     
     const updatedMeeting = await Meeting.findByIdAndUpdate(
       meetingId,
       { 
         meetingLink,
-        status: "Planifié" // Automatically set status to Planifié
+        status: "Planifié" 
       },
       { new: true }
     )
@@ -326,7 +321,6 @@ exports.generateAndSaveMeetingLink = async (req, res) => {
       return res.status(404).json({ error: "Meeting not found" });
     }
 
-    // Send email to user with the meeting link
     if (updatedMeeting.userId && updatedMeeting.userId.email) {
       try {
         const transporter = nodemailer.createTransport({
@@ -352,11 +346,9 @@ exports.generateAndSaveMeetingLink = async (req, res) => {
           minute: '2-digit'
         });
 
-        // Get user name with fallbacks
         const userFirstName = updatedMeeting.userId?.firstName || "Client";
         const userLastName = updatedMeeting.userId?.lastName || "";
         
-        // Get employee info with fallbacks
         const employeeInfo = updatedMeeting.employeeId ? 
           `${updatedMeeting.employeeId.firstName || ""} ${updatedMeeting.employeeId.lastName || ""}`.trim() : 
           'À déterminer';
@@ -436,8 +428,6 @@ exports.generateAndSaveMeetingLink = async (req, res) => {
     res.status(500).json({ error: "Server error" });
   }
 };
-
-// Get meeting link for user
 exports.getMeetingLinkForUser = async (req, res) => {
   try {
     const { meetingId } = req.params;
@@ -467,13 +457,12 @@ exports.getMeetingLinkForUser = async (req, res) => {
   }
 };
 
-// Get employee meetings (for calendar view)
 exports.getEmployeeMeetings = async (req, res) => {
   try {
     const { employeeId } = req.params;
     
     if (!mongoose.Types.ObjectId.isValid(employeeId)) {
-      return res.status(400).json({ error: "Invalid employee ID" });
+      return res.status(400)
     }
 
     const meetings = await Meeting.find({ 
@@ -495,27 +484,24 @@ exports.getEmployeeMeetings = async (req, res) => {
   }
 };
 
-// Update meeting status (modified to handle meeting links)
 exports.updateMeetingStatus = async (req, res) => {
   try {
     const { meetingId } = req.params;
     const { status, employeeId, meetingLink, date } = req.body;
 
     if (!mongoose.Types.ObjectId.isValid(meetingId)) {
-      return res.status(400).json({ error: "Invalid meeting ID" });
+      return res.status(400).json({ error: "X" });
     }
 
     const updateData = { status };
     
-    // Handle employee assignment
     if (employeeId) {
       if (!mongoose.Types.ObjectId.isValid(employeeId)) {
-        return res.status(400).json({ error: "Invalid employee ID" });
+        return res.status(400).json({ error: "X" });
       }
       updateData.employeeId = employeeId;
     }
 
-    // Handle date update
     if (date) {
       const parsedDate = new Date(date);
       if (isNaN(parsedDate.getTime())) {
@@ -524,7 +510,6 @@ exports.updateMeetingStatus = async (req, res) => {
       updateData.date = parsedDate;
     }
 
-    // Handle meeting link
     if (meetingLink) {
       updateData.meetingLink = meetingLink;
     }

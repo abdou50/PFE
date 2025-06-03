@@ -4,20 +4,16 @@ const fs = require("fs");
 const path = require("path");
 const nodemailer = require('nodemailer');
 
-// Helper function to construct file URLs
 const constructFileUrls = (files) => {
-  // Return the file paths as they are stored in the database
   return files;
 };
 
-// Helper function to create a directory if it doesn't exist
 const createDirectoryIfNotExists = (dir) => {
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
   }
 };
 
-// Create a new reclamation with multiple files
 exports.createReclamation = async (req, res) => {
   try {
     const { title, firstName, department, type, ministre, description, userId, status } = req.body;
@@ -76,14 +72,12 @@ exports.createReclamation = async (req, res) => {
   }
 };
 
-// Update a reclamation with multiple files
 exports.updateReclamation = async (req, res) => {
   try {
     const { id } = req.params;
     const { title, description, filesToDelete, status, guichetierId, feedback, employeeId } = req.body;
     const newFiles = req.files ? req.files.map((file) => `/uploads/reclamations/${id}/${file.filename}`) : [];
 
-    // Find the existing reclamation and populate user details
     const existingReclamation = await Reclamation.findById(id).populate({
       path: 'userId',
       select: 'firstName lastName email'
@@ -93,14 +87,11 @@ exports.updateReclamation = async (req, res) => {
       return res.status(404).json({ msg: "Reclamation not found" });
     }
 
-    // Remove files from the folder and the database
     if (filesToDelete && filesToDelete.length > 0) {
       let filesToDeleteArray;
       try {
-        // Attempt to parse filesToDelete as JSON
         filesToDeleteArray = JSON.parse(filesToDelete);
       } catch (err) {
-        // If parsing fails, assume filesToDelete is already an array
         filesToDeleteArray = Array.isArray(filesToDelete) ? filesToDelete : [filesToDelete];
       }
 
@@ -242,7 +233,6 @@ exports.updateReclamation = async (req, res) => {
   }
 };
 
-// Get reclamations by user ID
 exports.getReclamationsByUserId = async (req, res) => {
   try {
     const { userId } = req.params;
@@ -258,7 +248,6 @@ exports.getReclamationsByUserId = async (req, res) => {
   }
 };
 
-// Get reclamations by department
 exports.getReclamationsByDepartment = async (req, res) => {
   try {
     const { department } = req.params;
@@ -278,14 +267,10 @@ exports.getReclamationsByDepartment = async (req, res) => {
   }
 };
 
-// Update reclamation status
-// Update the updateStatus function
 exports.updateStatus = async (req, res) => {
   try {
     const { id } = req.params;
     const { status, feedback, employeeId, guichetierId } = req.body;
-
-    // Validate the status
     const validStatuses = ["brouillant", "envoyer", "en attente", "rejetée", "traitée"];
     if (!validStatuses.includes(status)) {
       return res.status(400).json({ msg: "Invalid status provided" });
@@ -406,13 +391,11 @@ exports.updateStatus = async (req, res) => {
     res.status(500).json({ msg: "Server error", error: err.message });
   }
 };
-// Get filtered reclamations by user ID, type, and status
 exports.getFilteredReclamations = async (req, res) => {
   try {
     const { userId } = req.params;
     const { type, status } = req.query;
 
-    // Build the filter object
     const filter = { userId, status: { $ne: "brouillant" } }; // Exclude "brouillant"
 
     if (type) filter.type = type;
@@ -435,7 +418,6 @@ exports.getFilteredReclamations = async (req, res) => {
   }
 };
 
-// Get a single reclamation by ID
 exports.getReclamationById = async (req, res) => {
   try {
     const { id } = req.params;
@@ -480,7 +462,6 @@ exports.getReclamationById = async (req, res) => {
     res.status(500).json({ msg: "Server error", error: err.message });
   }
 };
-// Get all reclamations with populated user details
 exports.getAllReclamations = async (req, res) => {
   try {
     const reclamations = await Reclamation.find()
@@ -503,7 +484,6 @@ exports.getAllReclamations = async (req, res) => {
     res.status(500).json({ msg: "Server error", error: err.message });
   }
 };
-// In your reclamation controller
 exports.deleteReclamation = async (req, res) => {
   try {
     const reclamation = await Reclamation.findByIdAndDelete(req.params.id);

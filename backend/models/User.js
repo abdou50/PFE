@@ -21,7 +21,7 @@ const UserSchema = new mongoose.Schema({
     type: String, 
     required: function() { return this.role === "user"; }
   },
-  service: {  // Add this new field
+  service: { 
     type: String,
     required: function() { return this.role === "user"; }
   }
