@@ -72,7 +72,6 @@ const statusConfig: Record<MeetingStatus, StatusConfig> = {
   }
 };
 
-// Helper function to safely get status config
 const getStatusConfig = (status: string): StatusConfig => {
   return statusConfig[status as MeetingStatus] || {
     color: "gray",
