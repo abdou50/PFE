@@ -16,7 +16,10 @@ const eslintConfig = [
       "react/no-unescaped-entities": "off",
       "@typescript-eslint/no-unused-vars": "off",           // Désactive "variable non utilisée"
       "@typescript-eslint/no-explicit-any": "off",           // Désactive "no any"
-      "react-hooks/exhaustive-deps": "warn",      },
+      "react-hooks/exhaustive-deps": "warn",   
+      "prefer-const": "off",
+
+    },
   },
 ];
 
