@@ -18,7 +18,7 @@ const eslintConfig = [
       "@typescript-eslint/no-explicit-any": "off",           // Désactive "no any"
       "react-hooks/exhaustive-deps": "warn",   
       "prefer-const": "off",
-
+      "@next/next/no-img-element": "warn",                  // Add this for img element warnings
     },
   },
 ];
