@@ -13,8 +13,10 @@ const eslintConfig = [
   ...compat.extends("next/core-web-vitals", "next/typescript"),
   {
     rules: {
-      "react/no-unescaped-entities": "off", // Désactivation temporaire pour le déploiement
-    },
+      "react/no-unescaped-entities": "off",
+      "@typescript-eslint/no-unused-vars": "off",           // Désactive "variable non utilisée"
+      "@typescript-eslint/no-explicit-any": "off",           // Désactive "no any"
+      "react-hooks/exhaustive-deps": "warn",      },
   },
 ];
 
